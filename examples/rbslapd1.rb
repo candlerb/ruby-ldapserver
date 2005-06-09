@@ -10,10 +10,12 @@ require 'ldapserver/tcpserver'
 require 'ldapserver/connection'
 require 'ldapserver/operation'
 
+# We subclass the Operation class, overriding the methods to do what we need
+
 class HashOperation < LDAPserver::Operation
   def initialize(connection, messageID, hash)
     super(connection, messageID)
-    @hash = hash
+    @hash = hash   # our directory data
   end
 
   def search(basedn, scope, deref, filter, attrs)
@@ -61,6 +63,19 @@ end
 # It's just a hash of {dn=>entry}, where each entry is {attr=>[val,val,...]}
 
 directory = {}
+
+# Let's put some backing store on it
+
+require 'yaml'
+begin
+  File.open("ldapdb.yaml") { |f| directory = YAML::load(f.read) }
+rescue Errno::ENOENT
+end
+
+at_exit do
+  File.open("ldapdb.new","w") { |f| f.write(YAML::dump(directory)) }
+  File.rename("ldapdb.new","ldapdb.yaml")
+end
 
 # Listen for incoming LDAP connections. For each one, create a Connection
 # object, which will invoke a HashOperation object for each request.

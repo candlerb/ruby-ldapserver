@@ -4,7 +4,7 @@ What is it?
 ruby-ldapserver is a lightweight, pure Ruby skeleton for implementing LDAP
 server applications. It is intended primarily for when you wish to build a
 gateway from LDAP queries into some other protocol or database; it does not
-attempt to be a full implementation of the bizarre LDAP data model itself
+attempt to be a full implementation of the standard LDAP data model itself
 (although you could build one using this as a frontend)
 
 The Connection class handles incoming connections, decodes ASN1-formatted
@@ -37,10 +37,11 @@ Status
 
 This is an initial alpha release. There are lots of missing features
 including:
+- handle generation of LDAP referrals properly
 - filter support
 - test suite (inc. abandon, concurrent threading, and performance tests)
-- TLS/SSL support
 - compare and modifyrdn
+- TLS/SSL support
 
 Contact
 -------
