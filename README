@@ -1,0 +1,55 @@
+What is it?
+-----------
+
+ruby-ldapserver is a lightweight, pure Ruby skeleton for implementing LDAP
+server applications. It is intended primarily for when you wish to build a
+gateway from LDAP queries into some other protocol or database; it does not
+attempt to be a full implementation of the bizarre LDAP data model itself
+(although you could build one using this as a frontend)
+
+The Connection class handles incoming connections, decodes ASN1-formatted
+LDAP requests, and creates an Operation object for each request. The
+Operation object further parses the ASN1 request and invokes methods which
+you override to perform useful work. Responses and exceptions are converted
+back into ASN1 and returned to the client.
+
+Since it's written entirely in Ruby, it benefits from Ruby's threading
+engine. You should ensure that your operations handler is also thread-safe;
+for example, you could allocate a pool of 10 Mysql handles, and borrow one
+from the pool for each query that you wish to handle. The examples/
+subdirectory includes some running examples you can use as a starting point.
+
+Libraries
+---------
+
+ASN1 encoding and decoding is done using the 'openssl' extension, which is
+standard in the Ruby 1.8.2 base distribution. However, I've found in the
+past that Linux machines don't always build the openssl extension when
+compiling Ruby from source. With Red Hat 9, the solution for me was, when
+building Ruby itself:
+
+    # export CPPFLAGS="-I/usr/kerberos/include"
+    # export LDFLAGS="-L/usr/kerberos/lib"
+    # ./configure ...etc
+
+Status
+------
+
+This is an initial alpha release. There are lots of missing features
+including:
+- filter support
+- test suite (inc. abandon, concurrent threading, and performance tests)
+- TLS/SSL support
+- compare and modifyrdn
+
+Contact
+-------
+
+Feel free E-mail me with patches and suggestions for this software. However,
+please DON'T send me any general questions about LDAP, how it works, how to
+apply LDAP in your particular situation, or questions about any other LDAP
+software. The `ldap@umich.edu` mailing list is probably the correct place to
+ask such questions. See:
+<http://listserver.itd.umich.edu/cgi-bin/lyris.pl?enter=ldap>
+
+Brian Candler <B.Candler@pobox.com>
