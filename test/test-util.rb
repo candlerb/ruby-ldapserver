@@ -10,7 +10,7 @@ class TestLdapUtil < Test::Unit::TestCase
     # examples from RFC 2253
     assert_equal(
 	[{"cn"=>"Steve Kille"},{"o"=>"Isode Limited"},{"c"=>"GB"}],
-	LDAPserver::Operation.split_dn("CN=Steve Kille , O=Isode Limited,C=GB")
+	LDAPserver::Operation.split_dn("CN=Steve Kille , O=Isode Limited;C=GB")
     )
     assert_equal(
 	[{"ou"=>"Sales","cn"=>"J. Smith"},{"o"=>"Widget Inc."},{"c"=>"US"}],
