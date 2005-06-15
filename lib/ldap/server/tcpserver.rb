@@ -13,22 +13,27 @@ module LDAPserver
   #   (to avoid the trivial DoS that the first limit creates)
   
   def tcpserver(*args, &blk)
+    opt = args.pop
+    logger = opt[:logger] || $stderr
+    server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
     Thread.new do
-      opt = args.pop
-      server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
-      logger = opt[:logger] || $stderr
-      while session = server.accept
-        # subtlety: copy 'session' into a block-local variable because
-        # it will change when the next session is accepted
-        Thread.new(session) do |s|
-          begin
-            s.instance_eval(*args, &blk)
-          rescue Exception => e
-            logger << "[#{s.peeraddr[3]}]: #{e}: #{e.backtrace[0]}\n"
-          ensure
-            s.close
+      begin
+        while session = server.accept
+          # subtlety: copy 'session' into a block-local variable because
+          # it will change when the next session is accepted
+          Thread.new(session) do |s|
+            begin
+              s.instance_eval(*args, &blk)
+            rescue Exception => e
+              logger << "[#{s.peeraddr[3]}]: #{e}: #{e.backtrace[0]}\n"
+            ensure
+              s.close
+            end
           end
         end
+      # This is the 'server shutdown' exception
+      rescue Interrupt
+        server.close if server and not server.closed?
       end
     end
   end

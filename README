@@ -14,34 +14,66 @@ you override to perform useful work. Responses and exceptions are converted
 back into ASN1 and returned to the client.
 
 Since it's written entirely in Ruby, it benefits from Ruby's threading
-engine. You should ensure that your operations handler is also thread-safe;
-for example, you could allocate a pool of 10 Mysql handles, and borrow one
-from the pool for each query that you wish to handle. The examples/
-subdirectory includes some running examples you can use as a starting point.
+engine. You should ensure that your operations handler is thread-safe; for
+example, you could allocate a pool of 10 Mysql handles, and borrow one from
+the pool for each query that you wish to handle. The examples/ subdirectory
+includes some running examples you can use as a starting point.
 
 Libraries
 ---------
 
 ASN1 encoding and decoding is done using the 'openssl' extension, which is
-standard in the Ruby 1.8.2 base distribution. However, I've found in the
-past that Linux machines don't always build the openssl extension when
-compiling Ruby from source. With Red Hat 9, the solution for me was, when
-building Ruby itself:
+standard in the Ruby 1.8.2 base distribution. You should be able to run
+`ruby -ropenssl -e puts` with no error.
+
+However, I've found in the past that Linux machines don't always build the
+openssl extension when compiling Ruby from source. With Red Hat 9, the
+solution for me was, when building Ruby itself:
 
     # export CPPFLAGS="-I/usr/kerberos/include"
     # export LDFLAGS="-L/usr/kerberos/lib"
     # ./configure ...etc
 
+If you want to run the test suite, then you'll need to install the ruby-ldap
+client library.
+
+Protocol implementation
+-----------------------
+
+ruby-ldapserver tries to be a pretty complete implementation of the message
+decoding and encoding components of LDAP. However, it does not synthesise or
+enforce the LDAP data model. For example, if you want to publish LDAP
+entries to advertise your servers' capabilities in the root DSE (as required
+by RFC 2251 section 3.4) this is your own responsibility. If you don't then
+you won't be LDAP v3 compliant, but then again if you're just using LDAP as
+a convenient query interface into some other database, you probably don't
+care.
+
+If your clients permit it, you can violate the LDAP specification further,
+eliminating some of the gross design flaws of LDAP. For example, you can
+ditch the LDAP idea that a Distinguished Name must consist of
+attr=val,attr=val,attr=val... and use whatever is convenient as a primary
+key (e.g. "val1,val2,val3" or "id,table_name"). The 'add' operation could
+allocate DNs automatically from a sequence. There's no need for the data
+duplication where an LDAP entry must contain the same attr=val pair which is
+also the entry's RDN. Violations of the LDAP spec in this way are at your
+own risk.
+
 Status
 ------
+This is an initial alpha release.
 
-This is an initial alpha release. There are lots of missing features
-including:
-- handle generation of LDAP referrals properly
-- filter support
-- test suite (inc. abandon, concurrent threading, and performance tests)
-- compare and modifyrdn
-- TLS/SSL support
+To-do list
+----------
+- handle and test generation of LDAP referrals properly
+- test suite - abandon, concurrency, performance tests, error handling
+- ldaps support
+- extensible match filters
+- extended operations
+  RFC 2830 - TLS
+  RFC 3062 - password modify
+  RFC 2839 - whoami
+  RFC 3909 - cancel
 
 Contact
 -------

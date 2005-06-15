@@ -58,6 +58,50 @@ class HashOperation < LDAPserver::Operation
       end
     end
   end
+
+  def modifydn(dn, newrdn, deleteoldrdn, newSuperior)
+    # OK, let's implement the icky LDAP model where an rdn is attr=val
+    # and the LDAP entry itself must contain this attr=val pair
+
+    snewrdn = LDAPserver::split_dn(newrdn)
+    raise LDAPserver::NamingViolation if snewrdn.size != 1
+
+    if newSuperior
+      sndn = snewrdn + LDAPserver::split(newSuperior)
+      ndn = LDAPserver::join_dn(sndn)
+    else
+      sndn = LDAPserver::split_dn(dn)
+      sndn[0] = snewrdn[0]
+      ndn = LDAPserver::join_dn(sndn)
+    end
+
+    raise LDAPserver::NoSuchObject unless @hash[dn]
+    raise LDAPserver::EntryAlreadyExists if @hash[ndn]
+    entry = @hash[ndn] = @hash.delete(dn)
+
+    if deleteoldrdn
+      LDAPserver::split_dn(dn)[0].each do |attr,vals|
+        vals.each do |val|
+          entry[attr].delete(val)
+        end
+      end
+    end
+
+    snewrdn[0].each do |attr,vals|
+      vals.each do |val|
+        entry[attr] ||= []
+        entry[attr] << val
+      end
+    end    
+  end
+
+  def compare(dn, attr, val)
+    entry = @hash[dn]
+    return false unless entry
+    return false unless entry[attr]
+    return false unless entry[attr].include?(val)
+    return true
+  end
 end
 
 # This is the shared object which carries our actual directory entries.

@@ -1,7 +1,19 @@
 require 'timeout'
 require 'ldapserver/result'
+require 'ldapserver/filter'
 
 module LDAPserver
+
+  # Scope
+  BaseObject		= 0
+  SingleLevel		= 1
+  WholeSubtree		= 2
+
+  # DerefAliases
+  NeverDerefAliases	= 0
+  DerefInSearching	= 1
+  DerefFindingBaseObj	= 2
+  DerefAlways		= 3
 
   # Object to handle a single LDAP request. Typically you would
   # subclass this object and override methods 'simple_bind', 'search' etc.
@@ -187,8 +199,8 @@ module LDAPserver
       client_sizelimit = protocolOp.value[3].value
       client_timelimit = protocolOp.value[4].value
       @typesOnly = protocolOp.value[5].value
-      filter = protocolOp.value[6].value
-      attributes = protocolOp.value[7].value
+      filter = Filter::parse(protocolOp.value[6])
+      attributes = protocolOp.value[7].value.collect {|x| x.value}
 
       @rescount = 0
       @sizelimit = server_sizelimit
@@ -210,10 +222,14 @@ module LDAPserver
     rescue ResultCode => e
       send_SearchResultDone(e.to_i, :errorMessage=>e.message)
 
+    rescue Abandon
+      # send no response
+
     # Since this Operation is running in its own thread, we have to
     # catch all other exceptions. Otherwise, in the event of a programming
     # error, this thread will silently terminate and the client will wait
     # forever for a response.
+
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
       send_SearchResultDone(OperationsError.new.to_i, :errorMessage=>e.message)
@@ -243,6 +259,8 @@ module LDAPserver
 
     rescue ResultCode => e
       send_ModifyResponse(e.to_i, :errorMessage=>e.message)
+    rescue Abandon
+      # no response
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
       send_ModifyResponse(OperationsError.new.to_i, :errorMessage=>e.message)
@@ -256,6 +274,8 @@ module LDAPserver
 
     rescue ResultCode => e
       send_AddResponse(e.to_i, :errorMessage=>e.message)
+    rescue Abandon
+      # no response
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
       send_AddResponse(OperationsError.new.to_i, :errorMessage=>e.message)
@@ -268,12 +288,49 @@ module LDAPserver
 
     rescue ResultCode => e
       send_DelResponse(e.to_i, :errorMessage=>e.message)
+    rescue Abandon
+      # no response
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
       send_DelResponse(OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
-    # FIXME: Implement do_modifydn, do_compare
+    def do_modifydn(protocolOp, controls)
+      entry = protocolOp.value[0].value
+      newrdn = protocolOp.value[1].value
+      deleteoldrdn = protocolOp.value[2].value
+      if protocolOp.value.size > 3 and protocolOp.value[3].tag == 0
+        newSuperior = protocolOp.value[3].value
+      end
+      modifydn(entry, newrdn, deleteoldrdn, newSuperior)
+      send_ModifyDNResponse(0)
+
+    rescue ResultCode => e
+      send_ModifyDNResponse(e.to_i, :errorMessage=>e.message)
+    rescue Abandon
+      # no response
+    rescue Exception => e
+      @connection.log "#{e}: #{e.backtrace[0]}"
+      send_ModifyDNResponse(OperationsError.new.to_i, :errorMessage=>e.message)
+    end
+
+    def do_compare(protocolOp, controls)
+      entry = protocolOp.value[0].value
+      ava = protocolOp.value[1].value
+      if compare(entry, ava[0].value, ava[1].value)
+        send_CompareResponse(6)  # compareTrue
+      else
+        send_CompareResponse(5)  # compareFalse
+      end
+
+    rescue ResultCode => e
+      send_CompareResponse(e.to_i, :errorMessage=>e.message)
+    rescue Abandon
+      # no response
+    rescue Exception => e
+      @connection.log "#{e}: #{e.backtrace[0]}"
+      send_CompareResponse(OperationsError.new.to_i, :errorMessage=>e.message)
+    end
 
     ############################################################
     ### Methods to get parameters related to this connection ###
@@ -349,14 +406,15 @@ module LDAPserver
 
     # Handle a modifydn request; override this
 
-    def modifydn()
-      raise UnwillingToPerform, "delete not implemented"
+    def modifydn(entry, newrdn, deleteoldrdn, newSuperior)
+      raise UnwillingToPerform, "modifydn not implemented"
     end
 
-    # Handle a compare request; override this
+    # Handle a compare request; override this. Return true or false,
+    # or raise an exception for errors.
 
-    def compare()
-      raise UnwillingToPerform, "delete not implemented"
+    def compare(entry, attr, val)
+      raise UnwillingToPerform, "compare not implemented"
     end
 
   end # class Operation

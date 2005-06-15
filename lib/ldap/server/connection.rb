@@ -96,7 +96,6 @@ module LDAPserver
                                   do_bind(protocolOp, controls)
 
             when 2 # UnbindRequest
-              abandon_all
               throw(:close)
 
             when 3 # SearchRequest
@@ -104,37 +103,43 @@ module LDAPserver
               # client sends an overlapping request with same message ID,
               # so we don't have to worry about the case where there is
               # already a thread with this id in @active_reqs.
-              # However, to avoid a potential race we copy messageId/
+              # However, to avoid a race we copy messageId/
               # protocolOp/controls into thread-local variables, because
               # they will change when the next request comes in.
 
               @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
                 operationClass.new(self,thrm,*ocArgs).do_search(thrp, thrc)
+                @active_reqs.delete(thrm)
               end
 
             when 6 # ModifyRequest
               @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
                 operationClass.new(self,thrm,*ocArgs).do_modify(thrp, thrc)
+                @active_reqs.delete(thrm)
               end
 
             when 8 # AddRequest
               @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
                 operationClass.new(self,thrm,*ocArgs).do_add(thrp, thrc)
+                @active_reqs.delete(thrm)
               end
 
             when 10 # DelRequest
               @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
                 operationClass.new(self,thrm,*ocArgs).do_del(thrp, thrc)
+                @active_reqs.delete(thrm)
               end
 
             when 12 # ModifyDNRequest
               @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
                 operationClass.new(self,thrm,*ocArgs).do_modifydn(thrp, thrc)
+                @active_reqs.delete(thrm)
               end
 
             when 14 # CompareRequest
               @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
                 operationClass.new(self,thrm,*ocArgs).do_compare(thrp, thrc)
+                @active_reqs.delete(thrm)
               end
 
             when 16 # AbandonRequest
@@ -152,6 +157,7 @@ module LDAPserver
           end
         end
       end
+      abandon_all
     end
 
     def write(data)
@@ -176,6 +182,7 @@ module LDAPserver
     end
 
     def abandon_all
+      return if @active_reqs.size == 0
       @mutex.synchronize do
         @active_reqs.each do |id, thread|
           thread.raise Abandon if thread.alive?
