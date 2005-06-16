@@ -11,6 +11,7 @@ module LDAPserver
   # - have a limit on total number of concurrent connects
   # - have a limit on connections from a single IP, or from a /24
   #   (to avoid the trivial DoS that the first limit creates)
+  # - ACL using source IP address (or perhaps that belongs in application)
   
   def tcpserver(*args, &blk)
     opt = args.pop

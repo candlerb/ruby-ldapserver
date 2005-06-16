@@ -8,7 +8,7 @@ class FilterTest < Test::Unit::TestCase
 
   AV1 = {
     "foo" => ["abc","def"],
-    "bar" => ["baz"],
+    "bar" => ["wibblespong"],
   }
 
   def test_bad
@@ -54,6 +54,27 @@ class FilterTest < Test::Unit::TestCase
     assert_equal(true, LDAPserver::Filter.run([:le,"foo","abc"], AV1))
     assert_equal(false, LDAPserver::Filter.run([:le,"foo","abb"], AV1))
     assert_equal(false, LDAPserver::Filter.run([:le,"xyz","abc"], AV1))
+  end
+
+  def test_substrings
+    assert_equal(true, LDAPserver::Filter.run([:substrings,"foo",[:initial,"a"]], AV1))
+    assert_equal(true, LDAPserver::Filter.run([:substrings,"foo",[:initial,"def"]], AV1))
+    assert_equal(false, LDAPserver::Filter.run([:substrings,"foo",[:initial,"bc"]], AV1))
+    assert_equal(false, LDAPserver::Filter.run([:substrings,"foo",[:initial,"az"]], AV1))
+    assert_equal(true, LDAPserver::Filter.run([:substrings,"foo",[:initial,""]], AV1))
+    assert_equal(false, LDAPserver::Filter.run([:substrings,"zzz",[:initial,""]], AV1))
+    assert_equal(true, LDAPserver::Filter.run([:substrings,"foo",[:any,"a"]], AV1))
+    assert_equal(true, LDAPserver::Filter.run([:substrings,"foo",[:any,"e"]], AV1))
+    assert_equal(false, LDAPserver::Filter.run([:substrings,"foo",[:any,"ba"]], AV1))
+    assert_equal(false, LDAPserver::Filter.run([:substrings,"foo",[:any,"az"]], AV1))
+    assert_equal(true, LDAPserver::Filter.run([:substrings,"foo",[:final,"c"]], AV1))
+    assert_equal(true, LDAPserver::Filter.run([:substrings,"foo",[:final,"ef"]], AV1))
+    assert_equal(false, LDAPserver::Filter.run([:substrings,"foo",[:final,"ab"]], AV1))
+    assert_equal(false, LDAPserver::Filter.run([:substrings,"foo",[:final,"e"]], AV1))
+    assert_equal(true, LDAPserver::Filter.run([:substrings,"bar",[:initial,"wib"],[:final,"ong"]], AV1))
+    assert_equal(true, LDAPserver::Filter.run([:substrings,"bar",[:initial,""],[:final,""]], AV1))
+    assert_equal(false, LDAPserver::Filter.run([:substrings,"bar",[:initial,"wib"],[:final,"ble"]], AV1))
+    assert_equal(false, LDAPserver::Filter.run([:substrings,"bar",[:initial,"sp"],[:final,"ong"]], AV1))
   end
 
   def test_and

@@ -27,7 +27,9 @@ module LDAPserver
   class Filter
 
     # Parse a filter in OpenSSL::ASN1 format into our own format.
-    # There are some trivial optimisations we make.
+    #
+    # There are some trivial optimisations we make: e.g.
+    #   (&(objectclass=*)(cn=foo)) -> (&(cn=foo)) -> (cn=foo)
 
     def self.parse(asn1)
       case asn1.tag
@@ -37,7 +39,7 @@ module LDAPserver
         return [:true] if conds.size == 0
         return conds.first if conds.size == 1
         return [:false] if conds.include?([:false])
-        return [:and] + conds
+        return conds.unshift(:and)
 
       when 1 # or
         conds = asn1.value.collect { |a| parse(a) }
@@ -45,7 +47,7 @@ module LDAPserver
         return [:false] if conds.size == 0
         return conds.first if conds.size == 1
         return [:true] if conds.include?([:true])
-        return [:or] + conds
+        return conds.unshift(:or)
 
       when 2 # not
         cond = parse(asn1.value[0])
@@ -57,10 +59,13 @@ module LDAPserver
 	return [:not, cond]
 
       when 3 # equalityMatch
-        return [:eq, asn1.value[0].value, asn1.value[1].value]
+        attr = asn1.value[0].value.downcase
+        val = asn1.value[1].value
+        return [:true] if attr == "objectclass" and val == "top"
+        return [:eq, attr, val]
 
       when 4 # substrings
-        res = [:substrings, asn1.value[0].value]
+        res = [:substrings, asn1.value[0].value.downcase]
         asn1.value[1].value.each do |ss|
           case ss.tag
           when 0
@@ -74,10 +79,10 @@ module LDAPserver
         return res
 
       when 5 # greaterOrEqual
-        return [:ge, asn1.value[0].value, asn1.value[1].value]
+        return [:ge, asn1.value[0].value.downcase, asn1.value[1].value]
 
       when 6 # lessOrEqual
-        return [:le, asn1.value[0].value, asn1.value[1].value]
+        return [:le, asn1.value[0].value.downcase, asn1.value[1].value]
 
       when 7 # present
         attr = asn1.value.downcase
@@ -85,7 +90,7 @@ module LDAPserver
         return [:present, attr]
 
       when 8 # approxMatch
-        return [:approx, asn1.value[0].value, asn1.value[1].value]
+        return [:approx, asn1.value[0].value.downcase, asn1.value[1].value]
 
       #when 9 # extensibleMatch
 
@@ -93,6 +98,10 @@ module LDAPserver
         raise ProtocolError, "Unrecognised Filter tag #{asn1.tag}"
       end
     end
+
+    # Run a parsed filter against an attr=>[val] hash.
+    #
+    # Returns true, false or nil.
 
     def self.run(filter, av)
       case filter.first
@@ -138,9 +147,18 @@ module LDAPserver
         x = av[attr]
         return false if x.nil?
         x.each do |v|
-          # does this value match all the conditions?
-          filter[2..-1].each do |type,str|
-            # FIXME
+          # return true unless one of the substring conditions does not match
+          return true unless filter[2..-1].find do |type,str|
+            case type
+            when :initial
+              not v.index(str) == 0
+            when :any
+              not v.index(str)
+            when :final
+              not v.index(str, -str.length)
+            else
+              raise ProtocolError, "Unrecognised substring tag #{type.inspect}"
+            end
           end
         end
         return false

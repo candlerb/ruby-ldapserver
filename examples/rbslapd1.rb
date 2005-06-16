@@ -15,12 +15,29 @@ require 'ldapserver/operation'
 class HashOperation < LDAPserver::Operation
   def initialize(connection, messageID, hash)
     super(connection, messageID)
-    @hash = hash   # our directory data
+    @hash = hash   # an object reference to our directory data
   end
 
-  def search(basedn, scope, deref, filter, attrs)
-    @hash.each do |dn, av|
-      send_SearchResultEntry(dn, av)
+  def search(basedn, scope, deref, filter)
+    basedn.downcase!
+
+    case scope
+    when LDAPserver::BaseObject
+      # client asked for single object by DN
+      obj = @hash[basedn]
+      raise LDAPserver::NoSuchObject unless obj
+      send_SearchResultEntry(basedn, obj) if LDAPserver::Filter.run(filter, obj)
+
+    when LDAPserver::WholeSubtree
+      @hash.each do |dn, av|
+        next unless dn.index(basedn, -basedn.length)    # under basedn?
+        next unless LDAPserver::Filter.run(filter, av)  # attribute filter?
+        send_SearchResultEntry(dn, av)
+      end
+
+    else
+      raise LDAPserver::UnwillingToPerform, "OneLevel not implemented"
+
     end
   end
 
@@ -50,11 +67,11 @@ class HashOperation < LDAPserver::Operation
           entry.delete(attr)
         else
           vals.each { |v| entry[attr].delete(v) }
-          entry.delete(attr) if entry[attr] == {}
         end
       when :replace
         entry[attr] = vals
       end
+      entry.delete(attr) if entry[attr] == []
     end
   end
 end

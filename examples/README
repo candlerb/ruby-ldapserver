@@ -1,0 +1,33 @@
+Using the example programs
+==========================
+
+Example 1: trivial server using RAM hash
+----------------------------------------
+
+$ ruby rbslapd1.rb
+
+In another window:
+
+$ ldapadd -H ldap://127.0.0.1:1389/
+dn: dc=example,dc=com
+cn: Top object
+
+dn: uid=1,dc=example,dc=com
+cn: Fred Flintstone
+mail: fred@bedrock.org
+mail: fred.flintstone@bedrock.org
+
+dn: uid=2,dc=example,dc=com
+cn: Wilma Flintstone
+mail: wilma@bedrock.org
+^D
+
+Try these queries:
+
+$ ldapsearch -H ldap://127.0.0.1:1389/ -b "" "(objectclass=*)"
+$ ldapsearch -H ldap://127.0.0.1:1389/ -b "dc=example,dc=com" -s base "(objectclass=*)"
+$ ldapsearch -H ldap://127.0.0.1:1389/ -b "dc=example,dc=com" "(mail=fred*)"
+
+If you terminate the server with Ctrl-C, its contents should be written
+to disk as a YAML file.
+

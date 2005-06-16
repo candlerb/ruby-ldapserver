@@ -1,13 +1,15 @@
 --- 
-two: 
-  a: 
-    - "4"
-  b: 
-    - boing
-one: 
-  a: 
-    - "1"
-    - "2"
-    - "3"
-  b: 
-    - zog
+uid=2,dc=example,dc=com: 
+  cn: 
+    - Wilma Flintstone
+  mail: 
+    - wilma@bedrock.org
+dc=example,dc=com: 
+  cn: 
+    - Top object
+uid=1,dc=example,dc=com: 
+  cn: 
+    - Fred Flintstone
+  mail: 
+    - fred@bedrock.org
+    - fred.flintstone@bedrock.org

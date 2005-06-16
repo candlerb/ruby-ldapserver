@@ -30,8 +30,8 @@ class MockOperation < LDAPserver::Operation
     @@lastop = [:simple_bind, version, user, pass]
   end
 
-  def search(basedn, scope, deref, filter, attrs)
-    @@lastop = [:search, basedn, scope, deref, filter, attrs]
+  def search(basedn, scope, deref, filter)
+    @@lastop = [:search, basedn, scope, deref, filter, @attributes]
     send_SearchResultEntry("cn=foo", {"a"=>["1","2"], "b"=>"boing"})
     send_SearchResultEntry("cn=bar", {"a"=>["3","4","5"], "b"=>"wibble"})
   end
@@ -278,7 +278,7 @@ class TestLdap < Test::Unit::TestCase
     assert_equal([:search, "dc=localhost, dc=localdomain",
       LDAPserver::WholeSubtree,
       LDAPserver::NeverDerefAliases,
-      [:true], []], MockOperation.lastop)
+      [:true], nil], MockOperation.lastop)
     req("search2")
     assert_equal([:search, "dc=localhost, dc=localdomain",
       LDAPserver::BaseObject,

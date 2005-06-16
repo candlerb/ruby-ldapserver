@@ -74,19 +74,26 @@ module LDAPserver
       end
     end
 
-    # Send a found entry. Attributes are {attr1=>val1, attr2=>[val2,val3]}
+    # Send a found entry. Avs are {attr1=>val1, attr2=>[val2,val3]}
 
-    def send_SearchResultEntry(dn, attributes, opt={})
+    def send_SearchResultEntry(dn, avs, opt={})
       if @sizelimit
         @rescount += 1
         raise SizeLimitExceeded if @rescount > @sizelimit
       end
 
-      avseq = attributes.collect do |attr,vals|
-        vals = [] if @typesOnly
-        vals = [vals] unless vals.kind_of?(Array)
+      avseq = []
 
-        OpenSSL::ASN1::Sequence([
+      (@attributes || avs.keys).each do |attr|
+        if @typesOnly
+          vals = []
+        else
+          vals = avs[attr]
+          next if vals.nil?
+          vals = [vals] unless vals.kind_of?(Array)
+        end
+
+        avseq << OpenSSL::ASN1::Sequence([
           OpenSSL::ASN1::OctetString(attr),
           OpenSSL::ASN1::Set(vals.collect { |v| OpenSSL::ASN1::OctetString(v) })
         ])
@@ -97,8 +104,6 @@ module LDAPserver
           OpenSSL::ASN1::Sequence(avseq),
         ], 4, :IMPLICIT, :APPLICATION), opt)
     end
-
-    # FIXME: Add a send_SearchResultEntry which also tests av against filters
 
     def send_SearchResultReference(urls, opt={})
       send_LDAPMessage(OpenSSL::ASN1::Sequence(
@@ -200,7 +205,8 @@ module LDAPserver
       client_timelimit = protocolOp.value[4].value
       @typesOnly = protocolOp.value[5].value
       filter = Filter::parse(protocolOp.value[6])
-      attributes = protocolOp.value[7].value.collect {|x| x.value}
+      @attributes = protocolOp.value[7].value.collect {|x| x.value}
+      @attributes = nil if @attributes == []
 
       @rescount = 0
       @sizelimit = server_sizelimit
@@ -212,7 +218,7 @@ module LDAPserver
 
       Timeout::timeout(t, TimeLimitExceeded) do
         begin
-          search(baseObject, scope, deref, filter, attributes)
+          search(baseObject, scope, deref, filter)
         rescue NoMethodError => e
           send_SearchResultDone(UnwillingToPerform.new.to_i, :errorMessage=>e.message)
         end
