@@ -19,8 +19,11 @@ engine.
 Target audience
 ---------------
 
-Technically-savvy Ruby applications developers. The sort of people who are
+Technically-savvy Ruby applications developers; the sort of people who are
 happy to read RFCs and read code to work out what it does :-)
+
+The examples/ directory contains a couple of minimal LDAP servers which you
+can use as a starting point.
 
 Status
 ------
@@ -31,8 +34,8 @@ Libraries
 ---------
 
 ASN1 encoding and decoding is done using the 'openssl' extension, which is
-standard in the Ruby 1.8.2 base distribution. You should be able to run
-`ruby -ropenssl -e puts` with no error.
+standard in the Ruby 1.8.2 base distribution. To check you have it, you
+should be able to run `ruby -ropenssl -e puts` with no error.
 
 However, I've found in the past that Linux machines don't always build the
 openssl extension when compiling Ruby from source. With Red Hat 9, the
@@ -48,14 +51,14 @@ client library, available from <http://raa.ruby-lang.org/>
 Protocol implementation
 -----------------------
 
-ruby-ldapserver tries to be a pretty complete implementation of the message
-decoding and encoding components of LDAP. However, it does not synthesise or
-enforce the LDAP data model. For example, if you want to publish LDAP
-entries to advertise your servers' capabilities in the root DSE (as required
-by RFC 2251 section 3.4) this is your own responsibility. If you don't then
-you won't be LDAP v3 compliant, but then again if you're just using LDAP as
-a convenient query interface into some other database, you probably don't
-care.
+ruby-ldapserver tries to be a reasonably complete implementation of the
+message decoding and encoding components of LDAP. However, it does not
+synthesise or enforce the LDAP data model. For example, if you want to
+publish LDAP entries to advertise your servers' capabilities in the root DSE
+(as required by RFC 2251 section 3.4) this is your own responsibility. If
+you don't then you won't be LDAP v3 compliant, but then again if you're just
+using LDAP as a convenient query interface into some other database, you
+probably don't care.
 
 If your clients permit it, you can violate the LDAP specification further,
 eliminating some of the gross design flaws of LDAP. For example, you can
@@ -77,19 +80,19 @@ send multiple overlapping requests down the same TCP connection, I start a
 new Ruby thread for each Operation.
 
 If your Operation object deals with any global shared data, then it needs to
-do so in a thread-safe way. If this is new to you see
+do so in a thread-safe way. If this is new to you then see
 <http://www.rubycentral.com/book/tut_threads.html>
 <http://www.rubygarden.org/ruby?MultiThreading>
 
-For incoming client connections, I have suplied a tcpserver method which
+For incoming client connections, I have supplied a tcpserver method which
 starts a new Ruby thread for each client. This works fine, but in a
 multi-CPU system, all LDAP server operations will be processed on one CPU.
 You can replace this yourself, e.g. with a forking server, but then you will
-have the overhead of a fork() for each incoming connection, and the
-inability to hold open a persistent database handle, or for individual
-client threads to share data with the others. Or, you can build a pool of
-Ruby processes and talk to them using DRb (but then it's your responsibility
-to build the pool, and restart any child which dies)
+have the overhead of a fork() for each incoming connection, and lose the
+ability to hold open a persistent database handle, or for client threads to
+share data with each other. Or, you can build a pool of Ruby processes and
+talk to them using DRb (but then it's your responsibility to build the pool,
+and restart any child which dies)
 
 If you are using the default threading tcpserver, then beware that a number
 of Ruby extension libraries block the threading interpreter. In particular,
@@ -103,20 +106,25 @@ For example, when talking to a MySQL database, you might want to choose
 "ruby-mysql" (which is a pure Ruby implementation of the MySQL protocol)
 rather than "mysql-ruby" (which is a wrapper around the C API). I don't know
 for sure whether mysql-ruby blocks the Ruby threading interpreter, but it's
-possible.
+quite possible.
 
-Another threading issue to beware of is abandoned and timed-out operations.
-The Connection object handles them by raising an LDAPserver::Abandon
-exception in the Operation thread, which you can either ignore or rescue.
-However, if in rescuing it you end up putting (say) a SQL connection back
-into a pool, you should beware that the SQL connection may still be
-mid-query.
+Even with something like ruby-mysql, beware DNS lookups: resolver libraries
+can block too. You may be safer hard-coding IP addresses, or putting entries
+in /etc/hosts for the machines you want to contact.
+
+Another threading issue to think about is abandoned and timed-out
+operations. The Connection object handles these by raising an
+LDAPserver::Abandon or LDAPserver::TimeLimitExceeded exception in the
+Operation thread, which you can either ignore or rescue. However, if in
+rescuing it you end up putting (say) a SQL connection back into a pool, you
+should beware that the SQL connection may still be mid-query, so it's
+probably better to discard it and use a fresh one next time.
 
 To-do list
 ----------
 
 - handle and test generation of LDAP referrals properly
-- test suite - abandon, concurrency, performance tests, error handling
+- test suite: abandon, concurrency, performance tests, error handling
 - ldaps support
 - extensible match filters
 - extended operations
@@ -136,11 +144,11 @@ http://www.itu.int/ITU-T/studygroups/com10/languages/X.690_1297.pdf
 Contact
 -------
 
-Feel free E-mail me with patches and suggestions for this software. However,
-please DON'T send me any general questions about LDAP, how LDAP works, how
-to apply LDAP in your particular situation, or questions about any other
-LDAP software. The `ldap@umich.edu` mailing list is probably the correct
-place to ask such questions. See:
+Feel free to E-mail me with patches and suggestions for this software.
+However, please DON'T send me any general questions about LDAP, how LDAP
+works, how to apply LDAP in your particular situation, or questions about
+any other LDAP software. The `ldap@umich.edu` mailing list is probably the
+correct place to ask such questions. See:
 <http://listserver.itd.umich.edu/cgi-bin/lyris.pl?enter=ldap>
 
 Brian Candler <B.Candler@pobox.com>

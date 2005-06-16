@@ -31,3 +31,15 @@ $ ldapsearch -H ldap://127.0.0.1:1389/ -b "dc=example,dc=com" "(mail=fred*)"
 If you terminate the server with Ctrl-C, its contents should be written
 to disk as a YAML file.
 
+A fairly complete set of the filter language is implemented. However, this
+simple server works by simply scanning the entire database and applying the
+filter to each entry, so it won't scale to large applications. No validation
+of DN or attributes against any sort of schema is done.
+
+Example 2: simple LDAP to SQL mapping
+-------------------------------------
+
+You will need to set up a MySQL database with a table conforming to the
+schema given within the code. Once done, LDAP gives a read-only view of the
+database with only the filter "(uid=<foo>)" supported.
+

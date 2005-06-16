@@ -217,14 +217,11 @@ module LDAPserver
       t = client_timelimit if client_timelimit > 0 and client_timelimit < t
 
       Timeout::timeout(t, TimeLimitExceeded) do
-        begin
-          search(baseObject, scope, deref, filter)
-        rescue NoMethodError => e
-          send_SearchResultDone(UnwillingToPerform.new.to_i, :errorMessage=>e.message)
-        end
+        search(baseObject, scope, deref, filter)
       end
       send_SearchResultDone(0)
 
+    # Note that TimeLimitExceeded is a subclass of ResultCode
     rescue ResultCode => e
       send_SearchResultDone(e.to_i, :errorMessage=>e.message)
 
