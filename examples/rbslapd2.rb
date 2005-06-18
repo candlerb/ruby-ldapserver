@@ -49,10 +49,11 @@ class SQLPool
   def borrow
     conn = @pool.pop || Mysql::new(*@args)
     yield conn
-    @pool.push conn
   rescue Exception
-    @pool.push nil    # trash this connection
+    conn = nil			# put 'nil' back into the pool
     raise
+  ensure
+    @pool.push conn
   end
 end    
 
