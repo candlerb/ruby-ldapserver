@@ -129,7 +129,7 @@ down it.
 
 Using speedtest.rb and rbslapd1.rb, running on the *same* machine
 (single-processor AMD Athlon 2500+) I achieve around 800 searches per second
-with N=1,M=1000 and 400 searches per second with N=10,M=100
+with N=1,M=1000 and 300-400 searches per second with N=10,M=100.
 
 To-do list
 ----------
@@ -156,11 +156,11 @@ http://www.itu.int/ITU-T/studygroups/com10/languages/X.690_1297.pdf
 Contact
 -------
 
-Feel free to E-mail me with patches and suggestions for this software.
-However, please DON'T send me any general questions about LDAP, how LDAP
-works, how to apply LDAP in your particular situation, or questions about
-any other LDAP software. The `ldap@umich.edu` mailing list is probably the
-correct place to ask such questions. See:
+You are very welcome to E-mail me with bug reports, patches, comments and
+suggestions for this software. However, please DON'T send me any general
+questions about LDAP, how LDAP works, how to apply LDAP in your particular
+situation, or questions about any other LDAP software. The `ldap@umich.edu`
+mailing list is probably the correct place to ask such questions. See:
 <http://listserver.itd.umich.edu/cgi-bin/lyris.pl?enter=ldap>
 
 Brian Candler <B.Candler@pobox.com>
