@@ -17,6 +17,16 @@ module LDAPserver
     opt = args.pop
     logger = opt[:logger] || $stderr
     server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
+
+    # Typically the O/S will buffer response data for 100ms before sending.
+    # If the response is sent as a single write() then there's no need for it.
+    if opt[:nodelay]
+      begin
+        server.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
+      rescue Exception
+      end
+    end
+
     Thread.new do
       begin
         while session = server.accept

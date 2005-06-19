@@ -1,3 +1,9 @@
+20050619
+Added examples/speedtest.rb
+
+Added :nodelay option to tcpserver to set TCP_NODELAY socket option. This
+removes 100ms of latency in responses.
+
 20050618
 Fix examples/rbslapd2.rb SQLPool so that it always puts connections back
 into the pool (using 'ensure' this time :-)

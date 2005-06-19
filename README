@@ -120,9 +120,21 @@ rescuing it you end up putting (say) a SQL connection back into a pool, you
 should beware that the SQL connection may still be mid-query, so it's
 probably better to discard it and use a fresh one next time.
 
+Performance
+-----------
+
+examples/speedtest.rb is a simple client which forks N processes, and in
+each process opens an LDAP connection, binds, and sends M search requests
+down it.
+
+Using speedtest.rb and rbslapd1.rb, running on the *same* machine
+(single-processor AMD Athlon 2500+) I achieve around 800 searches per second
+with N=1,M=1000 and 400 searches per second with N=10,M=100
+
 To-do list
 ----------
 
+- degrade gracefully under high numbers of client connections
 - handle and test generation of LDAP referrals properly
 - test suite: abandon, concurrency, performance tests, error handling
 - ldaps support
