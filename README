@@ -22,8 +22,8 @@ Target audience
 Technically-savvy Ruby applications developers; the sort of people who are
 happy to read RFCs and read code to work out what it does :-)
 
-The examples/ directory contains a couple of minimal LDAP servers which you
-can use as a starting point.
+The examples/ directory contains a few minimal LDAP servers which you can
+use as a starting point.
 
 Status
 ------
@@ -45,8 +45,9 @@ solution for me was, when building Ruby itself:
     # export LDFLAGS="-L/usr/kerberos/lib"
     # ./configure ...etc
 
-If you want to run the test suite, then you'll need to install the ruby-ldap
-client library, available from <http://raa.ruby-lang.org/>
+If you want to run the test suite then you'll need to install the ruby-ldap
+client library, and if you want to run examples/rbslapd3.rb then you'll need
+the prefork library. Both are available from <http://raa.ruby-lang.org/>.
 
 Protocol implementation
 -----------------------
@@ -84,15 +85,16 @@ do so in a thread-safe way. If this is new to you then see
 <http://www.rubycentral.com/book/tut_threads.html>
 <http://www.rubygarden.org/ruby?MultiThreading>
 
-For incoming client connections, I have supplied a tcpserver method which
-starts a new Ruby thread for each client. This works fine, but in a
-multi-CPU system, all LDAP server operations will be processed on one CPU.
-You can replace this yourself, e.g. with a forking server, but then you will
-have the overhead of a fork() for each incoming connection, and lose the
-ability to hold open a persistent database handle, or for client threads to
-share data with each other. Or, you can build a pool of Ruby processes and
-talk to them using DRb (but then it's your responsibility to build the pool,
-and restart any child which dies)
+For incoming client connections, I have supplied a simple tcpserver method
+which starts a new Ruby thread for each client. This works fine, but in a
+multi-CPU system, all LDAP server operations will be processed on one CPU;
+also with a very large number of concurrent client connections, you may find
+you hit the a max-filedescriptors-per-process limit.
+
+However, you don't have to use tcpserver. You can instead write your own
+forking server, or use a preforking server library; see examples/rbslapd3.rb
+In this case, your connections are handled in separate processes so they
+cannot share data directly in RAM.
 
 If you are using the default threading tcpserver, then beware that a number
 of Ruby extension libraries block the threading interpreter. In particular,
@@ -104,9 +106,8 @@ or make sure each client is handled in a different process.
 
 For example, when talking to a MySQL database, you might want to choose
 "ruby-mysql" (which is a pure Ruby implementation of the MySQL protocol)
-rather than "mysql-ruby" (which is a wrapper around the C API). I don't know
-for sure whether mysql-ruby blocks the Ruby threading interpreter, but it's
-quite possible.
+rather than "mysql-ruby" (which is a wrapper around the C API, and blocks
+while waiting for responses from the server)
 
 Even with something like ruby-mysql, beware DNS lookups: resolver libraries
 can block too. You may be safer hard-coding IP addresses, or putting entries
