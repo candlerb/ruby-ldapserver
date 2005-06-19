@@ -110,10 +110,16 @@ rather than "mysql-ruby" (which is a wrapper around the C API, and blocks
 while waiting for responses from the server)
 
 Even with something like ruby-mysql, beware DNS lookups: resolver libraries
-can block too. You may be safer hard-coding IP addresses, or putting entries
-in /etc/hosts for the machines you want to contact.
+can block too. There is a pure Ruby resolver replacement in the standard
+library: if you do
 
-Another threading issue to think about is abandoned and timed-out
+    require 'resolv-replace'
+
+this changes TCPSocket and friends to use it instead of the default C
+resolver. Or you could just hard-code IP addresses, or put entries in
+/etc/hosts for the machines you want to contact.
+
+Another threading issue to think about is abandoned and timed-out LDAP
 operations. The Connection object handles these by raising an
 LDAPserver::Abandon or LDAPserver::TimeLimitExceeded exception in the
 Operation thread, which you can either ignore or rescue. However, if in
