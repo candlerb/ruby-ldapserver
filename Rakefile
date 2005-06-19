@@ -19,6 +19,6 @@ end
 task :tag do
   sh "cvs update"
   sh "cvs commit"
-  sh "cvs tag #{VER}"
+  sh "cvs tag RELEASE_#{VER.gsub(/\./,'_')}"
 end
   
