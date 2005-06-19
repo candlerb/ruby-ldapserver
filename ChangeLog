@@ -11,6 +11,9 @@ Added examples/rbslapd3.rb, a preforking LDAP server
 
 Tweak split_dn so that it should work properly with UTF-8 encoded strings
 
+Implemented SSL support in tcpserver, just by copying examples from
+openssl module.
+
 20050618
 Fix examples/rbslapd2.rb SQLPool so that it always puts connections back
 into the pool (using 'ensure' this time :-)

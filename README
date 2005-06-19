@@ -135,13 +135,11 @@ with N=1,M=1000 and 300-400 searches per second with N=10,M=100.
 To-do list
 ----------
 
-- degrade gracefully under high numbers of client connections
 - handle and test generation of LDAP referrals properly
 - test suite: abandon, concurrency, performance tests, error handling
-- ldaps support
 - extensible match filters
 - extended operations
-  RFC 2830 - TLS
+  RFC 2830 - Start TLS
   RFC 3062 - password modify
   RFC 2839 - whoami
   RFC 3909 - cancel

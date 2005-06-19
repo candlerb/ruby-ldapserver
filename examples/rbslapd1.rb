@@ -97,7 +97,13 @@ end
 # Listen for incoming LDAP connections. For each one, create a Connection
 # object, which will invoke a HashOperation object for each request.
 
-t = LDAPserver::tcpserver(:port=>1389, :nodelay=>true, :listen=>10) do
+t = LDAPserver::tcpserver(
+	:port=>1389,
+	:nodelay=>true,
+#	:ssl_key_file=>"key.pem",
+#	:ssl_cert_file=>"cert.pem",
+	:listen=>10
+) do
   LDAPserver::Connection::new(self).handle_requests(HashOperation, directory)
 end
 t.join
