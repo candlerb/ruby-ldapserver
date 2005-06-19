@@ -119,6 +119,7 @@ class DirOperation < LDAPserver::Operation
   end
 
   def modify(dn, ops)
+    dn.downcase!
     @dir.lock do
       @dir.update
       entry = @dir.data[dn]
@@ -148,6 +149,7 @@ end
 directory = Directory.new("ldapdb.yaml")
 
 ts = PreFork::new(1389)
+ts.max_request_per_child = 1000
 ts.start do |s|
   begin
     # $stderr.puts "Connection handled by pid #{$$}"

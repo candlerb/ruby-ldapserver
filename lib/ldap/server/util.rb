@@ -20,21 +20,19 @@ module LDAPserver
     #
     # Attribute names are downcased, but values are not. For any
     # case-insensitive attributes it's up to you to downcase them.
+    #
     # Note that only v2 clients should add extra space around the comma.
-    #
-    # FIXME: These methods are probably broken w.r.t. UTF8 handling,
-    # although the spec is far from clear. There is an example which
-    # shows a UTF8 character encoded as \xx\xx, and another example
-    # showing that a carriage-return can be escaped to \0D, but it
-    # doesn't explain exactly which characters *need* to be escaped
-    # in this way. Argh!!
-    #
-    # The full RFC1779 backwards-compatibility rules (e.g. quoted values)
+    # This is accepted, and so is semicolon instead of comma, but the
+    # full RFC1779 backwards-compatibility rules (e.g. quoted values)
     # are not implemented.
+    #
+    # I *think* these functions will work correctly with UTF8-encoded
+    # characters, given that a multibyte UTF8 character does not contain
+    # the bytes 00-7F and therefore we cannot confuse '\', '+' etc
 
     def self.split_dn(dn)
       # convert \\ to \5c, \+ to \2b etc
-      dn2 = dn.gsub(/\\([^a-fA-F0-9])/) { "\\%02x" % $1[0] }
+      dn2 = dn.gsub(/\\([ #,+"\\<>;])/) { "\\%02x" % $1[0] }
 
       # Now we know that \\ and \, do not exist, it's safe to split
       parts = dn2.split(/\s*[,;]\s*/)
@@ -60,8 +58,8 @@ module LDAPserver
       end
     end
 
-    # reverse of split_dn. Join [elements...]
-    # where each element can be {attr=>val...} or [[attr,val],...]
+    # Reverse of split_dn. Join [elements...]
+    # where each element can be {attr=>val,...} or [[attr,val],...]
     # or just [attr,val]
 
     def self.join_dn(elements)
