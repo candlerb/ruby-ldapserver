@@ -1,0 +1,9 @@
+20050618
+Fix examples/rbslapd2.rb SQLPool so that it always puts connections back
+into the pool (using 'ensure' this time :-)
+
+Modify connection.rb to ensure no memory leak in the event of exceptions
+being raised in operation threads.
+
+20050616
+RELEASE_0_1

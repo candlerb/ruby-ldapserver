@@ -106,40 +106,70 @@ module LDAPserver
               # However, to avoid a race we copy messageId/
               # protocolOp/controls into thread-local variables, because
               # they will change when the next request comes in.
+              #
+              # There is a theoretical race condition here: a client could
+              # send an abandon request before Thread.current is assigned to
+              # @active_reqs[thrm]. It's not a problem, because abandon isn't
+              # guaranteed to work anyway. Doing it this way ensures that
+              # @active_reqs does not leak memory on a long-lived connection.
 
-              @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                operationClass.new(self,thrm,*ocArgs).do_search(thrp, thrc)
-                @active_reqs.delete(thrm)
+              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
+                begin
+                  @active_reqs[thrm] = Thread.current
+                  operationClass.new(self,thrm,*ocArgs).do_search(thrp, thrc)
+                ensure
+                  @active_reqs.delete(thrm)
+                end
               end
 
             when 6 # ModifyRequest
-              @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                operationClass.new(self,thrm,*ocArgs).do_modify(thrp, thrc)
-                @active_reqs.delete(thrm)
+              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
+                begin
+                  @active_reqs[thrm] = Thread.current
+                  operationClass.new(self,thrm,*ocArgs).do_modify(thrp, thrc)
+                ensure
+                  @active_reqs.delete(thrm)
+                end
               end
 
             when 8 # AddRequest
-              @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                operationClass.new(self,thrm,*ocArgs).do_add(thrp, thrc)
-                @active_reqs.delete(thrm)
+              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
+                begin
+                  @active_reqs[thrm] = Thread.current
+                  operationClass.new(self,thrm,*ocArgs).do_add(thrp, thrc)
+                ensure
+                  @active_reqs.delete(thrm)
+                end
               end
 
             when 10 # DelRequest
-              @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                operationClass.new(self,thrm,*ocArgs).do_del(thrp, thrc)
-                @active_reqs.delete(thrm)
+              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
+                begin
+                  @active_reqs[thrm] = Thread.current
+                  operationClass.new(self,thrm,*ocArgs).do_del(thrp, thrc)
+                ensure
+                  @active_reqs.delete(thrm)
+                end
               end
 
             when 12 # ModifyDNRequest
-              @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                operationClass.new(self,thrm,*ocArgs).do_modifydn(thrp, thrc)
-                @active_reqs.delete(thrm)
+              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
+                begin
+                  @active_reqs[thrm] = Thread.current
+                  operationClass.new(self,thrm,*ocArgs).do_modifydn(thrp, thrc)
+                ensure
+                  @active_reqs.delete(thrm)
+                end
               end
 
             when 14 # CompareRequest
-              @active_reqs[messageId] = Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                operationClass.new(self,thrm,*ocArgs).do_compare(thrp, thrc)
-                @active_reqs.delete(thrm)
+              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
+                begin
+                  @active_reqs[thrm] = Thread.current
+                  operationClass.new(self,thrm,*ocArgs).do_compare(thrp, thrc)
+                ensure
+                  @active_reqs.delete(thrm)
+                end
               end
 
             when 16 # AbandonRequest
