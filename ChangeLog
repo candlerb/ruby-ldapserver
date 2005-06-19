@@ -1,25 +1,30 @@
-20050619
-Added examples/speedtest.rb
-
-Added :nodelay option to tcpserver to set TCP_NODELAY socket option. This
-removes 100ms of latency in responses.
-
-Added :listen option to tcpserver to set listen queue size. With the default
-of 5, and 100 children trying to connect, a few connections get dropped.
-
-Added examples/rbslapd3.rb, a preforking LDAP server
-
-Tweak split_dn so that it should work properly with UTF-8 encoded strings
+RELEASE_0_2
 
 Implemented SSL support in tcpserver, just by copying examples from
 openssl module.
 
-20050618
-Fix examples/rbslapd2.rb SQLPool so that it always puts connections back
-into the pool (using 'ensure' this time :-)
+Tweak split_dn so that it should work properly with UTF-8 encoded strings
+
+Added examples/rbslapd3.rb, a preforking LDAP server
+
+Added :listen option to tcpserver to set listen queue size. With the default
+of 5, and 100 children trying to connect, a few connections get dropped.
+
+Added :nodelay option to tcpserver to set TCP_NODELAY socket option. This
+removes 100ms of latency in responses.
+
+Added examples/speedtest.rb
+
+20050619
 
 Modify connection.rb to ensure no memory leak in the event of exceptions
 being raised in operation threads.
 
-20050616
+Fix examples/rbslapd2.rb SQLPool so that it always puts connections back
+into the pool (using 'ensure' this time :-)
+
+20050618
+
 RELEASE_0_1
+
+20050616
