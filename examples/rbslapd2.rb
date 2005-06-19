@@ -148,7 +148,7 @@ cache = LRUCache.new(PW_CACHE_SIZE)
 pool = SQLPool.new(SQL_POOL_SIZE, *SQL_CONNECT)
 SQLOperation.setcache(cache,pool)
 
-t = LDAPserver::tcpserver(:port=>LDAP_PORT,:nodelay=>true) do
+t = LDAPserver::tcpserver(:port=>LDAP_PORT, :nodelay=>true, :listen=>10) do
   LDAPserver::Connection::new(self).handle_requests(SQLOperation)
 end
 t.join

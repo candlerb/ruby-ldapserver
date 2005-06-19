@@ -4,6 +4,9 @@ Added examples/speedtest.rb
 Added :nodelay option to tcpserver to set TCP_NODELAY socket option. This
 removes 100ms of latency in responses.
 
+Added :listen option to tcpserver to set listen queue size. With the default
+of 5, and 100 children trying to connect, a few connections get dropped.
+
 20050618
 Fix examples/rbslapd2.rb SQLPool so that it always puts connections back
 into the pool (using 'ensure' this time :-)

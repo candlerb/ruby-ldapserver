@@ -26,6 +26,8 @@ module LDAPserver
       rescue Exception
       end
     end
+    # set queue size for incoming connections (default is 5)
+    server.listen(opt[:listen]) if opt[:listen]
 
     Thread.new do
       begin

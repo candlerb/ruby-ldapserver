@@ -23,4 +23,15 @@ CHILDREN.times do
     end
   end
 end
-pids.each { |p| Process.wait(p) }
+okcount = 0
+badcount = 0
+pids.each do |p|
+  Process.wait(p)
+  if $?.exitstatus == 0
+    okcount += 1
+  else
+    badcount += 1
+  end
+end
+puts "Children finished: #{okcount} ok, #{badcount} failed"
+exit badcount > 0 ? 1 : 0
