@@ -77,8 +77,8 @@ module LDAPserver
     # Send a found entry. Avs are {attr1=>val1, attr2=>[val2,val3]}
 
     def send_SearchResultEntry(dn, avs, opt={})
+      @rescount += 1
       if @sizelimit
-        @rescount += 1
         raise SizeLimitExceeded if @rescount > @sizelimit
       end
 

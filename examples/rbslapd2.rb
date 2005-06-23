@@ -6,6 +6,7 @@ require 'ldapserver/connection'
 require 'ldapserver/operation' 
 require 'mysql'                 # <http://www.tmtm.org/en/ruby/mysql/>
 require 'thread'
+require 'resolv-replace'	# ruby threading DNS client
 
 # An example of an LDAP to SQL gateway. We have a MySQL table which
 # contains (login_id,login,passwd) combinations, e.g.

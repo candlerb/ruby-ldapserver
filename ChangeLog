@@ -1,3 +1,11 @@
+tcpserver: add ability to drop privileges
+
+examples/rbslapd3.rb: make work if ldapdb.yaml does not exist. Also bind
+explicitly to 0.0.0.0; it seems that TCPSocket doesn't work properly in
+some circumstances without it (FreeBSD 5.4 with IPv6 disabled in kernel)
+
+20050620
+
 RELEASE_0_2
 
 Implemented SSL support in tcpserver, just by copying examples from

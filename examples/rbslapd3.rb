@@ -35,13 +35,14 @@ class Directory
   # synchronise with directory on disk (re-read if it has changed)
 
   def update
-    sb = File.stat(@filename)
-    return if @stat and @stat.ino == sb.ino and @stat.mtime == sb.mtime
-    @stat = sb
-
-    tmp = {}
     begin
-      File.open(@filename) { |f| tmp = YAML::load(f.read) }
+      tmp = {}
+      sb = File.stat(@filename)
+      return if @stat and @stat.ino == sb.ino and @stat.mtime == sb.mtime
+      File.open(@filename) do |f|
+        tmp = YAML::load(f.read)
+        @stat = f.stat
+      end
     rescue Errno::ENOENT
     end
     @data = tmp
@@ -74,6 +75,7 @@ class DirOperation < LDAPserver::Operation
   end
 
   def search(basedn, scope, deref, filter)
+    $debug << "Search: basedn=#{basedn.inspect}, scope=#{scope.inspect}, deref=#{deref.inspect}, filter=#{filter.inspect}\n" if $debug
     basedn.downcase!
 
     case scope
@@ -82,13 +84,17 @@ class DirOperation < LDAPserver::Operation
       @dir.update
       obj = @dir.data[basedn]
       raise LDAPserver::NoSuchObject unless obj
-      send_SearchResultEntry(basedn, obj) if LDAPserver::Filter.run(filter, obj)
+      ok = LDAPserver::Filter.run(filter, obj)
+      $debug << "Match=#{ok.inspect}: #{obj.inspect}\n" if $debug
+      send_SearchResultEntry(basedn, obj) if ok
 
     when LDAPserver::WholeSubtree
       @dir.update
       @dir.data.each do |dn, av|
+        $debug << "Considering #{dn}\n" if $debug
         next unless dn.index(basedn, -basedn.length)    # under basedn?
         next unless LDAPserver::Filter.run(filter, av)  # attribute filter?
+        $debug << "Sending: #{av.inspect}\n" if $debug
         send_SearchResultEntry(dn, av)
       end
 
@@ -148,11 +154,11 @@ end
 
 directory = Directory.new("ldapdb.yaml")
 
-ts = PreFork::new(1389)
+ts = PreFork::new("0.0.0.0",1389)
 ts.max_request_per_child = 1000
 ts.start do |s|
   begin
-    # $stderr.puts "Connection handled by pid #{$$}"
+    $debug << "Connection handled by pid #{$$}\n" if $debug
     s.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
 
     LDAPserver::Connection::new(s).handle_requests(DirOperation, directory)

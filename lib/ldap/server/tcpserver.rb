@@ -17,6 +17,7 @@ module LDAPserver
   # Options:
   #   :port=>port number [required]
   #   :bindaddr=>"IP address"
+  #   :logger=>object				- implements << method
   #   :listen=>number				- listen queue depth
   #   :nodelay=>true				- set TCP_NODELAY option
   #   :ssl_key_file=>pem, :ssl_cert_file=>pem	- enable SSL
@@ -27,6 +28,11 @@ module LDAPserver
     logger = opt[:logger] || $stderr
     server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
 
+    # Drop privileges if requested
+    require 'etc' if opt[:group] or opt[:user]
+    Process.egid = Etc.getgrnam(opt[:group]).gid if opt[:group]
+    Process.euid = Etc.getpwnam(opt[:user]).uid if opt[:user]
+   
     # Typically the O/S will buffer response data for 100ms before sending.
     # If the response is sent as a single write() then there's no need for it.
     if opt[:nodelay]
@@ -47,7 +53,7 @@ module LDAPserver
         ctx.verify_mode = 
           OpenSSL::SSL::VERIFY_PEER|OpenSSL::SSL::VERIFY_FAIL_IF_NO_PEER_CERT
       else
-        $stderr.puts "Warning: SSL peer certificate won't be verified"
+        logger << "Warning: SSL peer certificate won't be verified\n"
       end
       server = OpenSSL::SSL::SSLServer.new(server, ctx)
     end
@@ -98,6 +104,6 @@ if __FILE__ == $0
     end
     print "+OK bye\r\n"
   end
-  #sleep 10; t.kill	# run for fixed time period
-  t.join		# or: run until Ctrl-C
+  #sleep 10; t.raise Interrupt	# run for fixed time period
+  t.join			# or: run until Ctrl-C
 end 
