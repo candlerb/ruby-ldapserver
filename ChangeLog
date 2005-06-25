@@ -1,3 +1,13 @@
+
+Factored out the SSL stuff into Connection, which should also allow the
+STARTTLS extension to be implemented later
+
+Added a Server class, with methods run_tcpserver and run_prefork.
+
+Created an explicit preforkserver method.
+
+20050625
+
 tcpserver: add ability to drop privileges
 
 examples/rbslapd3.rb: make work if ldapdb.yaml does not exist. Also bind

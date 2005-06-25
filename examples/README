@@ -44,8 +44,9 @@ Example 1a: with SSL
 
 In rbslapd1.rb, uncomment
 
-	:ssl_key_file=>"key.pem",
-	:ssl_cert_file=>"cert.pem",
+	:ssl_key_file		=> "key.pem",
+	:ssl_cert_file		=> "cert.pem",
+	:ssl_on_connect		=> true,
 
 and run mkcert.rb. Since this is a self-signed certificate, you'll have to
 turn off certificate verification in the client too. For example:

@@ -149,7 +149,14 @@ cache = LRUCache.new(PW_CACHE_SIZE)
 pool = SQLPool.new(SQL_POOL_SIZE, *SQL_CONNECT)
 SQLOperation.setcache(cache,pool)
 
-t = LDAPserver::tcpserver(:port=>LDAP_PORT, :nodelay=>true, :listen=>10) do
-  LDAPserver::Connection::new(self).handle_requests(SQLOperation)
-end
-t.join
+s = LDAPserver::Server.new(
+	:port			=> LDAP_PORT,
+	:nodelay		=> true,
+	:listen			=> 10,
+#	:ssl_key_file		=> "key.pem",
+#	:ssl_cert_file		=> "cert.pem",
+#	:ssl_on_connect		=> true,
+	:operation_class	=> SQLOperation
+)
+s.run_tcpserver
+s.join

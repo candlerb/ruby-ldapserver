@@ -14,13 +14,11 @@
 
 $:.unshift('../lib')
 
-require 'ldapserver/tcpserver'
-require 'ldapserver/connection'
+require 'ldapserver/server'
 require 'ldapserver/operation'
-require 'prefork'		# <http://raa.ruby-lang.org/project/prefork/>
 require 'yaml'
 
-$debug = $stderr
+$debug = nil # $stderr
 
 # An object to keep our in-RAM database and synchronise it to disk
 # when necessary
@@ -156,18 +154,15 @@ end
 
 directory = Directory.new("ldapdb.yaml")
 
-ts = PreFork::new("0.0.0.0",1389)
-ts.max_request_per_child = 1000
-ts.start do |s|
-  begin
-    $debug << "Connection handled by pid #{$$}\n" if $debug
-    s.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
-
-    LDAPserver::Connection::new(s).handle_requests(DirOperation, directory)
-
-  rescue Exception=>e
-    $stderr.print "[#{s.peeraddr[3]}]: #{e}: #{e.backtrace[0]}\n"
-  ensure
-    s.close
-  end
-end
+s = LDAPserver::Server.new(
+	:port			=> 1389,
+	:nodelay		=> true,
+	:listen			=> 10,
+#	:ssl_key_file		=> "key.pem",
+#	:ssl_cert_file		=> "cert.pem",
+#	:ssl_on_connect		=> true,
+	:operation_class	=> DirOperation,
+	:operation_args		=> [directory]
+)
+s.run_prefork
+s.join

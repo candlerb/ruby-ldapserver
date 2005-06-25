@@ -6,8 +6,7 @@
 
 $:.unshift('../lib')
 
-require 'ldapserver/tcpserver'
-require 'ldapserver/connection'
+require 'ldapserver/server'
 require 'ldapserver/operation'
 
 # We subclass the Operation class, overriding the methods to do what we need
@@ -97,13 +96,15 @@ end
 # Listen for incoming LDAP connections. For each one, create a Connection
 # object, which will invoke a HashOperation object for each request.
 
-t = LDAPserver::tcpserver(
-	:port=>1389,
-	:nodelay=>true,
-#	:ssl_key_file=>"key.pem",
-#	:ssl_cert_file=>"cert.pem",
-	:listen=>10
-) do
-  LDAPserver::Connection::new(self).handle_requests(HashOperation, directory)
-end
-t.join
+s = LDAPserver::Server.new(
+	:port			=> 1389,
+	:nodelay		=> true,
+	:listen			=> 10,
+#	:ssl_key_file		=> "key.pem",
+#	:ssl_cert_file		=> "cert.pem",
+#	:ssl_on_connect		=> true,
+	:operation_class	=> HashOperation,
+	:operation_args		=> [directory]
+)
+s.run_tcpserver
+s.join

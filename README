@@ -141,6 +141,10 @@ with N=1,M=1000 and 300-400 searches per second with N=10,M=100.
 To-do list
 ----------
 
+- schema support:
+  - publish root DSE and subschemaSubentry
+  - handle case-insensitive attribute matching
+  - map attribute aliases to standard name
 - handle and test generation of LDAP referrals properly
 - test suite: abandon, concurrency, performance tests, error handling
 - extensible match filters

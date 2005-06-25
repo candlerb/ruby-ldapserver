@@ -16,16 +16,30 @@ module LDAPserver
 
     def initialize(io, opt={})
       @io = io
+      @opt = opt
       @mutex = Mutex.new
       @active_reqs = {}   # map message ID to thread object
       @binddn = nil
       @version = 3
-      @opt = opt
-      @logger = opt[:logger] || $stderr
+      @logger = @opt[:logger] || $stderr
+      @ssl = false
+
+      startssl if @opt[:ssl_on_connect]
     end
 
     def log(msg)
       @logger << "[#{@io.peeraddr[3]}]: #{msg}\n"
+    end
+
+    def startssl
+      @mutex.synchronize do
+        raise LDAPserver::OperationsError if @ssl or @active_reqs.size > 0
+        yield if block_given?
+        @io = OpenSSL::SSL::SSLSocket.new(@io, @opt[:ssl_ctx])
+        @io.sync_close = true
+        @io.accept
+        @ssl = true
+      end
     end
 
     # Read one ASN1 element from the given stream.
@@ -66,7 +80,9 @@ module LDAPserver
       # return blk, [blk[0] >> 6, tag], offset
     end
 
-    def handle_requests(operationClass, *ocArgs)
+    def handle_requests
+      operationClass = @opt[:operation_class]
+      ocArgs = @opt[:operation_args] || []
       catch(:close) do
         while true
           begin

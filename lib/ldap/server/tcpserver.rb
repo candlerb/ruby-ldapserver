@@ -1,5 +1,4 @@
 require 'socket'
-require 'openssl'
 
 module LDAPserver
 
@@ -17,14 +16,13 @@ module LDAPserver
   # Options:
   #   :port=>port number [required]
   #   :bindaddr=>"IP address"
+  #   :user=>"username"				- drop privileges after bind
+  #   :group=>"groupname"			- ditto
   #   :logger=>object				- implements << method
   #   :listen=>number				- listen queue depth
   #   :nodelay=>true				- set TCP_NODELAY option
-  #   :ssl_key_file=>pem, :ssl_cert_file=>pem	- enable SSL
-  #   :ssl_ca_path=>directory			- verify peer certificates
 
-  def tcpserver(*args, &blk)
-    opt = args.pop
+  def tcpserver(opt, &blk)
     logger = opt[:logger] || $stderr
     server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
 
@@ -44,20 +42,6 @@ module LDAPserver
     # set queue size for incoming connections (default is 5)
     server.listen(opt[:listen]) if opt[:listen]
 
-    if opt[:ssl_key_file] and opt[:ssl_cert_file]
-      ctx = OpenSSL::SSL::SSLContext.new
-      ctx.key = OpenSSL::PKey::RSA.new(File::read(opt[:ssl_key_file]))
-      ctx.cert = OpenSSL::X509::Certificate.new(File::read(opt[:ssl_cert_file]))
-      if opt[:ssl_ca_path]
-        ctx.ca_path = opt[:ssl_ca_path]
-        ctx.verify_mode = 
-          OpenSSL::SSL::VERIFY_PEER|OpenSSL::SSL::VERIFY_FAIL_IF_NO_PEER_CERT
-      else
-        logger << "Warning: SSL peer certificate won't be verified\n"
-      end
-      server = OpenSSL::SSL::SSLServer.new(server, ctx)
-    end
-
     Thread.new do
       while true
         begin
@@ -66,16 +50,13 @@ module LDAPserver
           # it will change when the next session is accepted
           Thread.new(session) do |s|
             begin
-              s.instance_eval(*args, &blk)
+              s.instance_eval(&blk)
             rescue Exception => e
               logger << "[#{s.peeraddr[3]}]: #{e}: #{e.backtrace[0]}\n"
             ensure
               s.close
             end
           end
-        rescue OpenSSL::SSL::SSLError
-          # Problem negotiating SSL, probably connection from non-SSL client.
-          # Ignore.
         rescue Interrupt
           # This exception can be raised to shut the server down
           server.close if server and not server.closed?
@@ -104,6 +85,6 @@ if __FILE__ == $0
     end
     print "+OK bye\r\n"
   end
-  #sleep 10; t.raise Interrupt	# run for fixed time period
-  t.join			# or: run until Ctrl-C
+  #sleep 10; t.raise Interrupt	# uncomment to run for fixed time period
+  t.join
 end 
