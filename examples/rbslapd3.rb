@@ -20,6 +20,8 @@ require 'ldapserver/operation'
 require 'prefork'		# <http://raa.ruby-lang.org/project/prefork/>
 require 'yaml'
 
+$debug = $stderr
+
 # An object to keep our in-RAM database and synchronise it to disk
 # when necessary
 
