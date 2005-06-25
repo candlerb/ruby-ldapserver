@@ -20,9 +20,11 @@ module LDAPserver
 
     def initialize(opt = DEFAULT_OPT)
       @opt = opt
+      @opt[:server] = self
       @opt[:operation_class] ||= LDAPserver::Operation
       @opt[:operation_args] ||= []
       LDAPserver::Server.ssl_prepare(@opt)
+
     end
 
     # create opt[:ssl_ctx] from the other ssl options
@@ -68,6 +70,41 @@ module LDAPserver
     def stop
       @thread.raise Interrupt
       @thread.join
+    end
+
+    def setup_root
+      # set up a minimal root DSE
+
+      @root_dse = {
+	# 
+	'objectClass' => ['top','extensibleObject'],
+	# RFC 2251
+	'namingContexts' => [],
+	'subschemaSubentry' => ["cn=Subschema"],	# see also...
+	'altServer' => [],
+	'supportedExtension' => [],
+	'supportedControl' => [],
+	'supportedSASLMechanisms' => [],
+	'supportedLDAPVersion' => ['3'],	# note 1
+      }
+      # note 1: despite LDAP defining syntax types and associating them
+      # with attributes, everything is encoded as a string
+
+      @subschema = {
+	'objectClass' => ['top','extensibleObject'],
+	'cn' => ['Subschema'],				# ...see also
+	'objectClasses' => [
+	  "( 2.5.6.0 NAME 'top' DESC 'top of the superclass chain' ABSTRACT MUST objectClass )",
+	  "( 1.3.6.1.4.1.1466.101.120.111 NAME 'extensibleObject' DESC 'RFC2252: extensible object' SUP top AUXILIARY )",
+        ],
+	'attributeTypes' => [],
+	'matchingRules' => [],
+	'matchingRuleUse' => [],
+	'dITStructureRules' => [],
+	'dITContentRules' => [],
+	'nameForms' => [],
+	'ldapSyntaxes' => [],
+      }
     end
   end
 end

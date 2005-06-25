@@ -30,6 +30,10 @@ module LDAPserver
       ])
     end
 
+    def server
+      @connection.opt[:server]
+    end
+
     ##################################################
     ### Utility methods to send protocol responses ###
     ##################################################

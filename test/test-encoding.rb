@@ -12,8 +12,7 @@ Thread.abort_on_exception = true
 $:.unshift('../lib')
 
 require 'ldapserver/operation'
-require 'ldapserver/connection'
-require 'ldapserver/tcpserver'
+require 'ldapserver/server'
 
 require 'test/unit'
 require 'ldap'
@@ -64,16 +63,19 @@ end
 
 class MockServer
   def start
-    @thread = LDAPserver::tcpserver(:bindaddr=>"127.0.0.1", :port=>1389) do
-      LDAPserver::Connection.new(self).handle_requests(MockOperation)
-    end
+    @server = LDAPserver::Server.new(
+	:bindaddr		=> "127.0.0.1",
+	:port			=> 1389,
+	:nodelay		=> true,
+	:operation_class	=> MockOperation
+    )
+    @server.run_tcpserver
   end
 
   def stop
-    if @thread
-      @thread.raise Interrupt
-      @thread.join
-      @thread = nil
+    if @server
+      @server.stop
+      @server = nil
     end
   end
 end
