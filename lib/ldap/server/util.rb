@@ -1,6 +1,7 @@
-require 'ldapserver/result'
+require 'ldap/server/result'
 
-module LDAPserver
+module LDAP
+class Server
 
   class Operation
 
@@ -82,5 +83,6 @@ module LDAPserver
     end
 
   end # class Operation
-end # module LDAPserver
 
+end # class Server
+end # module LDAP

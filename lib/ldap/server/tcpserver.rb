@@ -1,8 +1,7 @@
 require 'socket'
 
-module LDAPserver
-
-  module_function
+module LDAP
+class Server
 
   # Accept connections on a port, and for each one start a new thread
   # and run the given block. Returns the Thread object for the listener.
@@ -22,7 +21,7 @@ module LDAPserver
   #   :listen=>number				- listen queue depth
   #   :nodelay=>true				- set TCP_NODELAY option
 
-  def tcpserver(opt, &blk)
+  def self.tcpserver(opt, &blk)
     logger = opt[:logger] || $stderr
     server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
 
@@ -66,12 +65,13 @@ module LDAPserver
     end
   end
 
-end # module LDAPserver
+end # class Server
+end # module LDAP
 
 if __FILE__ == $0
   # simple test
   puts "Running a test POP3 server on port 1110"
-  t = LDAPserver::tcpserver(:port=>1110) do
+  t = LDAP::Server::tcpserver(:port=>1110) do
     print "+OK I am a fake POP3 server\r\n"
     while line = gets
       case line

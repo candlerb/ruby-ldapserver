@@ -1,9 +1,8 @@
 require 'prefork'	# <http://raa.ruby-lang.org/project/prefork/>
 require 'socket'
 
-module LDAPserver
-
-  module_function
+module LDAP
+class Server
 
   # Accept connections on a port, and for each one run the given block
   # in one of N pre-forked children. Returns a Thread object for the
@@ -22,7 +21,7 @@ module LDAPserver
   #   :max_requests_per_child=>N
   #   :max_idle=>N				- seconds
 
-  def preforkserver(opt, &blk)
+  def self.preforkserver(opt, &blk)
     logger = opt[:logger] || $stderr
     server = PreFork.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
 
@@ -69,12 +68,13 @@ module LDAPserver
     end
   end
 
-end # module LDAPserver
+end # class Server
+end # module LDAP
 
 if __FILE__ == $0
   # simple test
   puts "Running a test POP3 server on port 1110"
-  t = LDAPserver::preforkserver(:port=>1110) do
+  t = LDAP::Server::preforkserver(:port=>1110) do
     print "+OK I am a fake POP3 server (pid #{$$})\r\n"
     while line = gets
       case line
@@ -90,4 +90,4 @@ if __FILE__ == $0
   end
   #sleep 10; t.raise Interrupt	# uncomment to run for fixed time period
   t.join
-end 
+end

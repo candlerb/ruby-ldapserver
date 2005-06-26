@@ -1,4 +1,5 @@
-module LDAPserver
+module LDAP
+class Server
 
   class Schema
 
@@ -96,4 +97,6 @@ module LDAPserver
     end # class AttributeType
 
   end # class Schema
-end # module LDAPserver
+
+end # class Server
+end # module LDAP

@@ -1,3 +1,6 @@
+Changed LDAPserver to LDAP::Server. Rejigged the repository to match.
+
+20050626
 
 Factored out the SSL stuff into Connection, which should also allow the
 STARTTLS extension to be implemented later

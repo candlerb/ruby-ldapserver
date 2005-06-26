@@ -1,15 +1,13 @@
 $:.unshift '../lib'
-require 'ldapserver/schema'
+require 'ldap/server/schema'
 require 'test/unit'
-
-include LDAPserver
 
 class SchemaTest < Test::Unit::TestCase
   def test_parse_attr
 attr = <<ATTR
 ( 2.5.4.3 NAME ( 'cn' 'commonName' ) OBSOLETE SINGLE-VALUE COLLECTIVE NO-USER-MODIFICATION USAGE userApplications )
 ATTR
-    a = Schema::AttributeType.new(attr)
+    a = LDAP::Server::Schema::AttributeType.new(attr)
     assert_equal("2.5.4.3", a.oid)
     assert_equal("cn", a.name)
     assert_equal(["cn", "commonName"], a.names)
@@ -23,7 +21,7 @@ ATTR
 attr = <<ATTR
 ( 2.5.4.3 NAME ( 'cn' 'commonName' ) DESC 'RFC2256: common name(s) for which the entity is known by' SUP name )
 ATTR
-    a = Schema::AttributeType.new(attr)
+    a = LDAP::Server::Schema::AttributeType.new(attr)
     assert_equal("2.5.4.3", a.oid)
     assert_equal("cn", a.name)
     assert_equal(["cn", "commonName"], a.names)

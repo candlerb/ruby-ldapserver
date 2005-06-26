@@ -1,8 +1,9 @@
 require 'thread'
 require 'openssl'
-require 'ldapserver/result'
+require 'ldap/server/result'
 
-module LDAPserver
+module LDAP
+class Server
 
   # An object which handles an LDAP connection. Note that LDAP allows
   # requests and responses to be exchanged asynchronously: e.g. a client
@@ -33,7 +34,7 @@ module LDAPserver
 
     def startssl
       @mutex.synchronize do
-        raise LDAPserver::OperationsError if @ssl or @active_reqs.size > 0
+        raise LDAP::Server::OperationsError if @ssl or @active_reqs.size > 0
         yield if block_given?
         @io = OpenSSL::SSL::SSLSocket.new(@io, @opt[:ssl_ctx])
         @io.sync_close = true
@@ -268,4 +269,5 @@ module LDAPserver
       )
     end
   end
-end
+end # class Server
+end # module LDAP

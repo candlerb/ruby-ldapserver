@@ -1,6 +1,7 @@
-require 'ldapserver/result'
+require 'ldap/server/result'
 
-module LDAPserver
+module LDAP
+class Server
 
   # LDAP filters are parsed into a LISP-like internal representation:
   #
@@ -205,4 +206,6 @@ module LDAPserver
     #def self.approxmatch(a,b)
     #end
   end # class Filter
-end
+end # class Server
+end # module LDAP
+

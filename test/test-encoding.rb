@@ -11,15 +11,15 @@ Thread.abort_on_exception = true
 
 $:.unshift('../lib')
 
-require 'ldapserver/operation'
-require 'ldapserver/server'
+require 'ldap/server/operation'
+require 'ldap/server/server'
 
 require 'test/unit'
 require 'ldap'
 
 # We subclass the Operation class, overriding the methods to do what we need
 
-class MockOperation < LDAPserver::Operation
+class MockOperation < LDAP::Server::Operation
   def initialize(connection, messageId)
     super(connection, messageId)
     @@lastop = [:connect]
@@ -61,25 +61,6 @@ class MockOperation < LDAPserver::Operation
   end
 end
 
-class MockServer
-  def start
-    @server = LDAPserver::Server.new(
-	:bindaddr		=> "127.0.0.1",
-	:port			=> 1389,
-	:nodelay		=> true,
-	:operation_class	=> MockOperation
-    )
-    @server.run_tcpserver
-  end
-
-  def stop
-    if @server
-      @server.stop
-      @server = nil
-    end
-  end
-end
-
 class TestLdap < Test::Unit::TestCase
 
   HOST = '127.0.0.1'
@@ -95,8 +76,13 @@ class TestLdap < Test::Unit::TestCase
 
     # back to a single process (the parent). Now we start our
     # listener thread
-    @serv = MockServer.new
-    @serv.start
+    @serv = LDAP::Server.new(
+	:bindaddr		=> "127.0.0.1",
+	:port			=> 1389,
+	:nodelay		=> true,
+	:operation_class	=> MockOperation
+    )
+    @serv.run_tcpserver
   end
 
   def teardown
@@ -278,13 +264,13 @@ class TestLdap < Test::Unit::TestCase
   def test_search
     req("search")
     assert_equal([:search, "dc=localhost, dc=localdomain",
-      LDAPserver::WholeSubtree,
-      LDAPserver::NeverDerefAliases,
+      LDAP::Server::WholeSubtree,
+      LDAP::Server::NeverDerefAliases,
       [:true], nil], MockOperation.lastop)
     req("search2")
     assert_equal([:search, "dc=localhost, dc=localdomain",
-      LDAPserver::BaseObject,
-      LDAPserver::NeverDerefAliases,
+      LDAP::Server::BaseObject,
+      LDAP::Server::NeverDerefAliases,
       [:and, [:eq, "cn", "foo"],
              [:or,  [:not, [:present, "sn"]],
                     [:ge, "ou", "baz"],

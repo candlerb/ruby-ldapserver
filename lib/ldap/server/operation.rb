@@ -1,8 +1,9 @@
 require 'timeout'
-require 'ldapserver/result'
-require 'ldapserver/filter'
+require 'ldap/server/result'
+require 'ldap/server/filter'
 
-module LDAPserver
+module LDAP
+class Server
 
   # Scope
   BaseObject		= 0
@@ -425,4 +426,5 @@ module LDAPserver
     end
 
   end # class Operation
-end # module LDAPserver
+end # class Server
+end # module LDAP

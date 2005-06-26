@@ -1,9 +1,7 @@
 #!/usr/local/bin/ruby -w
 
 $:.unshift('../lib')
-require 'ldapserver/tcpserver'
-require 'ldapserver/connection'
-require 'ldapserver/operation' 
+require 'ldap/server'
 require 'mysql'                 # <http://www.tmtm.org/en/ruby/mysql/>
 require 'thread'
 require 'resolv-replace'	# ruby threading DNS client
@@ -95,7 +93,7 @@ class LRUCache
 end
 
 
-class SQLOperation < LDAPserver::Operation
+class SQLOperation < LDAP::Server::Operation
   def self.setcache(cache,pool)
     @@cache = cache
     @@pool = pool
@@ -104,8 +102,8 @@ class SQLOperation < LDAPserver::Operation
   # Handle searches of the form "(uid=<foo>)" using SQL backend
 
   def search(basedn, scope, deref, filter)
-    raise LDAPserver::UnwillingToPerform, "Bad base DN" unless basedn == BASEDN
-    raise LDAPserver::UnwillingToPerform, "Bad filter" unless filter[0..1] == [:eq, "uid"]
+    raise LDAP::Server::UnwillingToPerform, "Bad base DN" unless basedn == BASEDN
+    raise LDAP::Server::UnwillingToPerform, "Bad filter" unless filter[0..1] == [:eq, "uid"]
     uid = filter[2]
     @@pool.borrow do |sql|
       q = "select login_id,passwd from #{TABLE} where login='#{sql.quote(uid)}'"
@@ -125,7 +123,7 @@ class SQLOperation < LDAPserver::Operation
   def simple_bind(version, dn, password)
     return if dn.nil?   # accept anonymous
 
-    raise LDAPserver::UnwillingToPerform unless dn =~ /\Aid=(\d+),#{BASEDN}\z/
+    raise LDAP::Server::UnwillingToPerform unless dn =~ /\Aid=(\d+),#{BASEDN}\z/
     login_id = $1
     dbpw = @@cache.find(login_id)
     unless dbpw
@@ -139,7 +137,7 @@ class SQLOperation < LDAPserver::Operation
         end
       end
     end
-    raise LDAPserver::InvalidCredentials unless dbpw and dbpw != "" and dbpw == password
+    raise LDAP::Server::InvalidCredentials unless dbpw and dbpw != "" and dbpw == password
   end
 end
 
@@ -149,7 +147,7 @@ cache = LRUCache.new(PW_CACHE_SIZE)
 pool = SQLPool.new(SQL_POOL_SIZE, *SQL_CONNECT)
 SQLOperation.setcache(cache,pool)
 
-s = LDAPserver::Server.new(
+s = LDAP::Server.new(
 	:port			=> LDAP_PORT,
 	:nodelay		=> true,
 	:listen			=> 10,

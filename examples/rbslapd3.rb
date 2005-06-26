@@ -14,8 +14,7 @@
 
 $:.unshift('../lib')
 
-require 'ldapserver/server'
-require 'ldapserver/operation'
+require 'ldap/server'
 require 'yaml'
 
 $debug = nil # $stderr
@@ -68,7 +67,7 @@ end
 
 # We subclass the Operation class, overriding the methods to do what we need
 
-class DirOperation < LDAPserver::Operation
+class DirOperation < LDAP::Server::Operation
   def initialize(connection, messageID, dir)
     super(connection, messageID)
     @dir = dir
@@ -79,27 +78,27 @@ class DirOperation < LDAPserver::Operation
     basedn.downcase!
 
     case scope
-    when LDAPserver::BaseObject
+    when LDAP::Server::BaseObject
       # client asked for single object by DN
       @dir.update
       obj = @dir.data[basedn]
-      raise LDAPserver::NoSuchObject unless obj
-      ok = LDAPserver::Filter.run(filter, obj)
+      raise LDAP::Server::NoSuchObject unless obj
+      ok = LDAP::Server::Filter.run(filter, obj)
       $debug << "Match=#{ok.inspect}: #{obj.inspect}\n" if $debug
       send_SearchResultEntry(basedn, obj) if ok
 
-    when LDAPserver::WholeSubtree
+    when LDAP::Server::WholeSubtree
       @dir.update
       @dir.data.each do |dn, av|
         $debug << "Considering #{dn}\n" if $debug
         next unless dn.index(basedn, -basedn.length)    # under basedn?
-        next unless LDAPserver::Filter.run(filter, av)  # attribute filter?
+        next unless LDAP::Server::Filter.run(filter, av)  # attribute filter?
         $debug << "Sending: #{av.inspect}\n" if $debug
         send_SearchResultEntry(dn, av)
       end
 
     else
-      raise LDAPserver::UnwillingToPerform, "OneLevel not implemented"
+      raise LDAP::Server::UnwillingToPerform, "OneLevel not implemented"
 
     end
   end
@@ -108,7 +107,7 @@ class DirOperation < LDAPserver::Operation
     dn.downcase!
     @dir.lock do
       @dir.update
-      raise LDAPserver::EntryAlreadyExists if @dir.data[dn]
+      raise LDAP::Server::EntryAlreadyExists if @dir.data[dn]
       @dir.data[dn] = av
       @dir.write
     end
@@ -118,7 +117,7 @@ class DirOperation < LDAPserver::Operation
     dn.downcase!
     @dir.lock do
       @dir.update
-      raise LDAPserver::NoSuchObject unless @dir.data.has_key?(dn)
+      raise LDAP::Server::NoSuchObject unless @dir.data.has_key?(dn)
       @dir.data.delete(dn)
       @dir.write
     end
@@ -129,7 +128,7 @@ class DirOperation < LDAPserver::Operation
     @dir.lock do
       @dir.update
       entry = @dir.data[dn]
-      raise LDAPserver::NoSuchObject unless entry
+      raise LDAP::Server::NoSuchObject unless entry
       ops.each do |op, attr, vals|
         case op 
         when :add
@@ -154,7 +153,7 @@ end
 
 directory = Directory.new("ldapdb.yaml")
 
-s = LDAPserver::Server.new(
+s = LDAP::Server.new(
 	:port			=> 1389,
 	:nodelay		=> true,
 	:listen			=> 10,

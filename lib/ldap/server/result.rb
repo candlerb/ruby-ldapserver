@@ -1,4 +1,5 @@
-module LDAPserver
+module LDAP
+class Server
 
   # This exception is raised when we need to kill an existing Operation
   # thread because of a received abandonRequest or bindRequest
@@ -51,4 +52,5 @@ module LDAPserver
   class ObjectClassModsProhibited < ResultCode;		def to_i; 69; end; end
   class AffectsMultipleDSAs < ResultCode;		def to_i; 71; end; end
   class Other < ResultCode;				def to_i; 80; end; end
-end
+end # class Server
+end # module LDAP

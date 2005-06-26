@@ -6,12 +6,11 @@
 
 $:.unshift('../lib')
 
-require 'ldapserver/server'
-require 'ldapserver/operation'
+require 'ldap/server'
 
 # We subclass the Operation class, overriding the methods to do what we need
 
-class HashOperation < LDAPserver::Operation
+class HashOperation < LDAP::Server::Operation
   def initialize(connection, messageID, hash)
     super(connection, messageID)
     @hash = hash   # an object reference to our directory data
@@ -21,40 +20,40 @@ class HashOperation < LDAPserver::Operation
     basedn.downcase!
 
     case scope
-    when LDAPserver::BaseObject
+    when LDAP::Server::BaseObject
       # client asked for single object by DN
       obj = @hash[basedn]
-      raise LDAPserver::NoSuchObject unless obj
-      send_SearchResultEntry(basedn, obj) if LDAPserver::Filter.run(filter, obj)
+      raise LDAP::Server::NoSuchObject unless obj
+      send_SearchResultEntry(basedn, obj) if LDAP::Server::Filter.run(filter, obj)
 
-    when LDAPserver::WholeSubtree
+    when LDAP::Server::WholeSubtree
       @hash.each do |dn, av|
         next unless dn.index(basedn, -basedn.length)    # under basedn?
-        next unless LDAPserver::Filter.run(filter, av)  # attribute filter?
+        next unless LDAP::Server::Filter.run(filter, av)  # attribute filter?
         send_SearchResultEntry(dn, av)
       end
 
     else
-      raise LDAPserver::UnwillingToPerform, "OneLevel not implemented"
+      raise LDAP::Server::UnwillingToPerform, "OneLevel not implemented"
 
     end
   end
 
   def add(dn, av)
     dn.downcase!
-    raise LDAPserver::EntryAlreadyExists if @hash[dn]
+    raise LDAP::Server::EntryAlreadyExists if @hash[dn]
     @hash[dn] = av
   end
 
   def del(dn)
     dn.downcase!
-    raise LDAPserver::NoSuchObject unless @hash.has_key?(dn)
+    raise LDAP::Server::NoSuchObject unless @hash.has_key?(dn)
     @hash.delete(dn)
   end
 
   def modify(dn, ops)
     entry = @hash[dn]
-    raise LDAPserver::NoSuchObject unless entry
+    raise LDAP::Server::NoSuchObject unless entry
     ops.each do |op, attr, vals|
       case op 
       when :add
@@ -96,7 +95,7 @@ end
 # Listen for incoming LDAP connections. For each one, create a Connection
 # object, which will invoke a HashOperation object for each request.
 
-s = LDAPserver::Server.new(
+s = LDAP::Server.new(
 	:port			=> 1389,
 	:nodelay		=> true,
 	:listen			=> 10,
