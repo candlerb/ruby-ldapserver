@@ -1,4 +1,10 @@
-Changed LDAPserver to LDAP::Server. Rejigged the repository to match.
+Changed LDAPserver to LDAP::Server and rejigged the repository to match.
+In your code you will have to change:
+  require 'ldapserver/foo'  ->  require 'ldap/server/foo'
+  LDAPserver::bar           ->  LDAP::Server::bar
+
+I have added require 'ldap/server' which pulls in the things a basic server
+will need (minus schema)
 
 20050626
 
