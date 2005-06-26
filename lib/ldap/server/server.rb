@@ -47,7 +47,7 @@ class Server
     require 'ldap/server/tcpserver'
 
     opt = @opt
-    @thread = LDAP::Server::tcpserver(@opt) do
+    @thread = LDAP::Server.tcpserver(@opt) do
       LDAP::Server::Connection::new(self,opt).handle_requests
     end
   end
@@ -56,7 +56,7 @@ class Server
     require 'ldap/server/preforkserver'
 
     opt = @opt
-    @thread = LDAP::Server::preforkserver(@opt) do
+    @thread = LDAP::Server.preforkserver(@opt) do
       LDAP::Server::Connection::new(self,opt).handle_requests
     end
   end

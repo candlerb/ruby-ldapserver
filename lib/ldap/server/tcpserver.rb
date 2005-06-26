@@ -71,7 +71,7 @@ end # module LDAP
 if __FILE__ == $0
   # simple test
   puts "Running a test POP3 server on port 1110"
-  t = LDAP::Server::tcpserver(:port=>1110) do
+  t = LDAP::Server.tcpserver(:port=>1110) do
     print "+OK I am a fake POP3 server\r\n"
     while line = gets
       case line
