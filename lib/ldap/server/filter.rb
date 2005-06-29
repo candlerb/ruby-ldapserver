@@ -1,4 +1,5 @@
 require 'ldap/server/result'
+require 'ldap/server/match'
 
 module LDAP
 class Server
@@ -24,6 +25,13 @@ class Server
   # constructs can be mapped to some fixed SQL queries.
   #
   # See RFC 2251 4.5.1 for the three-state(!) boolean logic from LDAP
+  #
+  # If a schema is provided: attribute names are looked up in it to
+  # find suitable matching rules. These are pushed in front of the array,
+  # e.g.  [:eq, attr, val] becomes [MatchingRule, :eq, attr, val]; also the
+  # attribute name will also be normalised to its first form as listed
+  # in the schema, e.g. 'commonname' becomes 'cn', 'objectclass' becomes
+  # 'objectClass' etc.
 
   class Filter
 
@@ -32,7 +40,7 @@ class Server
     # There are some trivial optimisations we make: e.g.
     #   (&(objectclass=*)(cn=foo)) -> (&(cn=foo)) -> (cn=foo)
 
-    def self.parse(asn1)
+    def self.parse(asn1, schema=nil)
       case asn1.tag
       when 0 # and
         conds = asn1.value.collect { |a| parse(a) }
@@ -63,10 +71,21 @@ class Server
         attr = asn1.value[0].value.downcase
         val = asn1.value[1].value
         return [:true] if attr == "objectclass" and val == "top"
+        if schema
+          a = schema.find_attr(attr)
+          return [:undef] unless a and a.equality
+          return [a.equality, :eq, a.name, val]
+        end
         return [:eq, attr, val]
 
       when 4 # substrings
-        res = [:substrings, asn1.value[0].value.downcase]
+        attr = asn1.value[0].value.downcase
+        res = [:substrings, attr]
+        if schema
+          a = schema.find_attr(attr)
+          return [:undef] unless a and a.substr
+          res = [a.substr, :substrings, a.name]
+        end
         asn1.value[1].value.each do |ss|
           case ss.tag
           when 0
@@ -80,20 +99,48 @@ class Server
         return res
 
       when 5 # greaterOrEqual
-        return [:ge, asn1.value[0].value.downcase, asn1.value[1].value]
+        attr = asn1.value[0].value.downcase
+        val = asn1.value[1].value
+        if schema
+          a = schema.find_attr(attr)
+          return [:undef] unless a and a.ordering
+          return [a.ordering, :ge, a.name, val]
+        end
+        return [:ge, attr, val]
 
       when 6 # lessOrEqual
-        return [:le, asn1.value[0].value.downcase, asn1.value[1].value]
+        attr = asn1.value[0].value.downcase
+        val = asn1.value[1].value
+        if schema
+          a = schema.find_attr(attr)
+          return [:undef] unless a and a.ordering
+          return [a.ordering, :le, a.name, val]
+        end
+        return [:le, attr, val]
 
       when 7 # present
         attr = asn1.value.downcase
         return [:true] if attr == "objectclass"
+        if schema
+          a = schema.find_attr(attr)
+          attr = a.name if a
+        end
         return [:present, attr]
 
       when 8 # approxMatch
-        return [:approx, asn1.value[0].value.downcase, asn1.value[1].value]
+        attr = asn1.value[0].value.downcase
+        val = asn1.value[1].value
+        if schema
+          a = schema.find_attr(attr)
+          # I don't know how properly to deal with approxMatch. I'm assuming
+          # that the object will have an equality MatchingRule, and we
+          # can defer to that.
+          return [a.equality, :approx, a.name, val] if a and a.equality
+        end
+        return [:approx, attr, val]
 
       #when 9 # extensibleMatch
+      #  FIXME
 
       else
         raise ProtocolError, "Unrecognised Filter tag #{asn1.tag}"
@@ -105,6 +152,13 @@ class Server
     # Returns true, false or nil.
 
     def self.run(filter, av)
+
+      # Quack! e.g. [duck, :eq, 'bar', '123'] sends duck.eq([vals], '123')
+      # where [vals] are the values for attribute 'bar' in this entry
+      if not filter[0].is_a?(Symbol) and filter[0].respond_to?(filter[1])
+        return filter[0].send(filter[1], av[filter[2]], *filter[3..-1])
+      end
+
       case filter.first
       when :and
         res = true
@@ -131,62 +185,19 @@ class Server
         else		return nil
         end
 
-      when :eq
-        attr, val = filter[1], filter[2]
-        x = av[attr]
-        # RFC2251 is a bit ambiguous. We are supposed to return Undefined
-        # (nil) if the attribute is "not recognised" by the server. Does
-        # that mean there are no instances of this attribute, or that the
-        # attribute is not in the schema? I think it's the latter.
-        # So we can't check that condition without a schema lookup.
-        return false if x.nil?
-        x.each { |v| return true if v == val }
-        return false
-
-      when :substrings
-        attr = filter[1]
-        x = av[attr]
-        return false if x.nil?
-        x.each do |v|
-          # return true unless one of the substring conditions does not match
-          return true unless filter[2..-1].find do |type,str|
-            case type
-            when :initial
-              not v.index(str) == 0
-            when :any
-              not v.index(str)
-            when :final
-              not v.index(str, -str.length)
-            else
-              raise ProtocolError, "Unrecognised substring tag #{type.inspect}"
-            end
-          end
-        end
-        return false
-
-      when :ge
-        attr, val = filter[1], filter[2]
-        x = av[attr]
-        return false if x.nil?
-        x.each { |v| return true if v >= val }
-        return false
-
-      when :le
-        attr, val = filter[1], filter[2]
-        x = av[attr]
-        return false if x.nil?
-        x.each { |v| return true if v <= val }
-        return false
-
       when :present
         return av.has_key?(filter[1])
 
-      when :approx
-        attr, val = filter[1], filter[2]
-        x = av[attr]
-        return false if x.nil?
-        x.each { |v| return true if approxmatch(v, val) }
-        return false
+      # Fallbacks for when there is no schema
+
+      when :eq, :substrings, :ge, :le
+        return LDAP::Server::MatchingRule::DefaultMatch.send(filter[0], av[filter[1]], *filter[2..-1])
+
+      #when :approx
+      #  I'm not sure how to deal with approx. No semantics are defined
+      #  in RFC2251 (perhaps they are in X500?) So I've assumed that anyone
+      #  who wants it will add a method to the equality MatchingRule for
+      #  their attribute.
 
       when :true
         return true
@@ -201,11 +212,20 @@ class Server
       raise OperationsError, "Unimplemented filter #{filter.first.inspect}"
     end
 
-    # I don't see any standard 'approx match' semantics, so define this yourself:
+    module EqualityMatch
+      def normalize(x)
+        x
+      end
 
-    #def self.approxmatch(a,b)
-    #end
+      def eq(vals,m)
+        m = normalize(m)
+        vals.each { |v| return true if m == normalize(v) }
+        return false
+      end
+    end
+
+
+
   end # class Filter
 end # class Server
 end # module LDAP
-

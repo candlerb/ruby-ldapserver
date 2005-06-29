@@ -35,6 +35,14 @@ class FilterTest < Test::Unit::TestCase
     assert_equal(false, LDAP::Server::Filter.run([:eq,"xyz","abc"], AV1))
   end
 
+  def test_eq_case
+    c = LDAP::Server::MatchingRule::CaseIgnoreMatch
+    assert_equal(true, LDAP::Server::Filter.run([c,:eq,"foo","ABC"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([c,:eq,"foo","DeF"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([c,:eq,"foo","ghi"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([c,:eq,"xyz","abc"], AV1))
+  end
+
   def test_not
     assert_equal(false, LDAP::Server::Filter.run([:not,[:eq,"foo","abc"]], AV1))
     assert_equal(false, LDAP::Server::Filter.run([:not,[:eq,"foo","def"]], AV1))
