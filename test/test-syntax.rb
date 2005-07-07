@@ -12,18 +12,24 @@ class SyntaxTest < Test::Unit::TestCase
     assert(s.hr)
     assert(s.match("123"))
     assert(!s.match("12A"))
-    assert_equal(123, s.from_s("123"))
-    assert_equal("456", s.to_s(456))
-    assert_equal("789", s.to_s(789))
+    assert_equal(123, s.value_from_s("123"))
+    assert_equal("456", s.value_to_s(456))
+    assert_equal("789", s.value_to_s(789))
   end
 
   def test_unknown
     s = LDAP::Server::Syntax.find("1.4.7.1")
     assert_equal(LDAP::Server::Syntax, s.class)
     assert_equal("1.4.7.1", s.oid)
+    assert_equal("1.4.7.1", s.to_s)
     assert_equal("( 1.4.7.1 )", s.to_def)
-    assert_equal("false", s.to_s(false))	# generic to_s
-    assert_equal("true", s.from_s("true"))	# generic from_s
+    assert_equal("false", s.value_to_s(false))	# generic value_to_s
+    assert_equal("true", s.value_from_s("true")) # generic value_from_s
     assert(s.match("123"))			# match anything
+  end
+
+  def test_nil
+    s = LDAP::Server::Syntax.find(nil)
+    assert_equal(nil, s)
   end
 end

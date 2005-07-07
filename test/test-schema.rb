@@ -16,7 +16,7 @@ ATTR
     assert_equal("1.2.3", a.equality)
     assert_equal("4.5.678", a.ordering)
     assert_equal("9.1.1", a.substr)
-    assert_equal("4.3.2", a.syntax)
+    assert_equal("4.3.2", a.syntax.to_s)
     assert_equal(58, a.maxlen)
     assert(a.singlevalue)
     assert(a.collective)

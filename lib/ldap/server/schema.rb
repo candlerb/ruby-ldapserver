@@ -1,3 +1,5 @@
+require 'ldap/server/syntax'
+
 module LDAP
 class Server
 
@@ -14,70 +16,33 @@ class Server
       end
     end
 
-    # Shared constants for the regexp-based syntax parsers
-
-    KEYSTR = "[a-zA-Z][a-zA-Z0-9;-]*"
-    NUMERICOID = "( \\d[\\d.]+\\d )"
-    WOID = "\\s* ( #{KEYSTR} | \\d[\\d.]+\\d ) \\s*"
-    _WOID = "\\s* (?: #{KEYSTR} | \\d[\\d.]+\\d ) \\s*"
-    OIDS = "( #{_WOID} | \\s* \\( #{_WOID} (?: \\$ #{_WOID} )* \\) \\s* )"
-    _QDESCR = "\\s* ' #{KEYSTR} ' \\s*"
-    QDESCRS = "( #{_QDESCR} | \\s* \\( (?:#{_QDESCR})+ \\) \\s* )"
-    QDSTRING = "\\s* ' (.*?) ' \\s*"
-    NOIDLEN = "(\\d[\\d.]+\\d) (?: \\{ (\\d+) \\} )?"
-    ATTRIBUTEUSAGE = "(userApplications|directoryOperation|distributedOperation|dSAOperation)"
-
-    SCAN_WOID = /#{WOID}/x
-
-    # shared functions for converting "( oid $ oid ... )" to array and
-    # back again
-
-    def self.oidlist_to_a(str)
-      ans = []
-    end
-
     #####################################################################
 
     # Class holding an instance of an AttributeTypeDescription (RFC2252 4.2)
 
     class AttributeType
-      PARSER = %r! \A \s* \( \s*
-	#{NUMERICOID} \s*
-	(?: NAME #{QDESCRS} )?
-        (?: DESC #{QDSTRING} )?
-        (   OBSOLETE \s* )?
-        (?: SUP #{WOID} )?
-        (?: EQUALITY #{WOID} )?
-        (?: ORDERING #{WOID} )?
-        (?: SUBSTR #{WOID} )?
-        (?: SYNTAX \s* #{NOIDLEN} \s* )?	# capture 2
-        (   SINGLE-VALUE \s* )?
-        (   COLLECTIVE \s* )?
-        (   NO-USER-MODIFICATION \s* )?
-        (?: USAGE \s* #{ATTRIBUTEUSAGE} )?
-        \s* \) \s* \z !xu
 
       attr_reader :oid, :names, :desc, :obsolete, :sup, :equality, :ordering
       attr_reader :substr, :syntax, :maxlen, :singlevalue, :collective
       attr_reader :nousermod, :usage
 
       def initialize(str)
-        raise "Bad AttributeTypeDescription #{str.inspect}" unless PARSER =~ str
-        @oid = $1
-	@desc = $3
-	@obsolete = ! $4.nil?
-	@sup = $5
-	@equality = $6
-	@ordering = $7
-	@substr = $8
-	@syntax = $9
-	@maxlen = $10 && $10.to_i
-	@singlevalue = ! $11.nil?
-	@collective = ! $12.nil?
-	@nousermod = ! $13.nil?
-	@usage = $14 && $14.intern
-        # do this last because it replaces last match variables
-        @names = ($2||"").scan(/'(.*?)'/).flatten
+        m = LDAP::Server::Syntax::AttributeTypeDescription.match(str)
+        raise "Bad AttributeTypeDescription #{str.inspect}" unless m
+        @oid = m[1]
+        @names = (m[2]||"").scan(/'(.*?)'/).flatten
+	@desc = m[3]
+	@obsolete = ! m[4].nil?
+	@sup = m[5]
+	@equality = m[6]
+	@ordering = m[7]
+	@substr = m[8]
+	@syntax = LDAP::Server::Syntax.find(m[9])
+	@maxlen = m[10] && m[10].to_i
+	@singlevalue = ! m[11].nil?
+	@collective = ! m[12].nil?
+	@nousermod = ! m[13].nil?
+	@usage = m[14] && m[14].intern
         # This is the cache of the stringified version. Rather than
         # initialize to str, we set nil to force it to be rebuilt
         @def = nil
@@ -128,22 +93,14 @@ class Server
     # Class holding an instance of an ObjectClassDescription (RFC2252 4.4)
 
     class ObjectClass
-      PARSER = %r! \A \s* \( \s*
-	#{NUMERICOID} \s*
-	(?: NAME #{QDESCRS} )?		# capture 2
-        (?: DESC #{QDSTRING} )?
-        (   OBSOLETE \s* )?
-        (?: SUP #{OIDS} )?
-        (?: ( ABSTRACT|STRUCTURAL|AUXILIARY ) \s* )?
-        (?: MUST #{OIDS} )?
-        (?: MAY #{OIDS} )?
-        \s* \) \s* \z !xu
 
       attr_reader :oid, :names, :desc, :obsolete, :sup, :struct, :must, :may
 
+      SCAN_WOID = /#{LDAP::Server::Syntax::WOID}/x
+
       def initialize(str)
-        raise "Bad ObjectClassDescription #{str.inspect}" unless PARSER =~ str
-        m = $~
+        m = LDAP::Server::Syntax::ObjectClassDescription.match(str)
+        raise "Bad ObjectClassDescription #{str.inspect}" unless m
         @oid = m[1]
         @names = (m[2]||"").scan(/'(.*?)'/).flatten
 	@desc = m[3]

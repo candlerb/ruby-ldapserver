@@ -14,6 +14,10 @@ class Server
       @def = nil
     end
 
+    def to_s
+      @oid
+    end
+
     # Create a new Syntax object, given its description string
 
     def self.from_def(str, *args)
@@ -21,25 +25,7 @@ class Server
       new($1, $2, *args)
     end
 
-    # Return true or a MatchData object if the given value matches
-    # the regular expression
-
-    def match(val)
-      return true if @re.nil?
-      @re.match(to_s(val))
-    end
-
-    # Convert a value for this syntax into its canonical string representation
-
-    def to_s(val)
-      val.to_s
-    end
-
-    # Convert a string value for this syntax into a Ruby-like value
-
-    def from_s(val)
-      val
-    end
+    # Convert this object to its description string
 
     def to_def
       return @def if @def
@@ -47,6 +33,26 @@ class Server
       ans << "DESC '#@desc' " if @desc
       ans << ")"
       @def = ans
+    end
+
+    # Return true or a MatchData object if the given value is allowed
+    # by this syntax
+
+    def match(val)
+      return true if @re.nil?
+      @re.match(value_to_s(val))
+    end
+
+    # Convert a value for this syntax into its canonical string representation
+
+    def value_to_s(val)
+      val.to_s
+    end
+
+    # Convert a string value for this syntax into a Ruby-like value
+
+    def value_from_s(val)
+      val
     end
 
     @@syntaxes = {}
@@ -62,6 +68,7 @@ class Server
     # Syntax object associated with this oid.
 
     def self.find(oid)
+      return nil if oid.nil?
       return @@syntaxes[oid] if @@syntaxes[oid]
       add(oid)
     end
@@ -104,17 +111,17 @@ class Server
     \s* \) \s* \z !xu)
 
     add("1.3.6.1.4.1.1466.115.121.1.5", "Binary", false)
-    # FIXME: to_s should BER-encode the value??
+    # FIXME: value_to_s should BER-encode the value??
 
     add("1.3.6.1.4.1.1466.115.121.1.6", "Bit String", true, /\A'([01]*)'B\z/)
     # FIXME: convert to FixNum?
 
     o = add("1.3.6.1.4.1.1466.115.121.1.7", "Boolean", true, /\A(TRUE|FALSE)\z/)
-    def o.to_s(v)
+    def o.value_to_s(v)
       return v if v.is_a?(string)
       v ? "TRUE" : "FALSE"
     end
-    def o.from_s(v)
+    def o.value_from_s(v)
       v.upcase == "TRUE"
     end
 
@@ -132,7 +139,7 @@ class Server
     # FIXME: Validate Generalized Time (find X.208) and convert to/from Ruby
     add("1.3.6.1.4.1.1466.115.121.1.26", "IA5 String", true)
     o = add("1.3.6.1.4.1.1466.115.121.1.27", "Integer", true, /\A\d+\z/)
-    def o.from_s(v)
+    def o.value_from_s(v)
       v.to_i
     end
     add("1.3.6.1.4.1.1466.115.121.1.28", "JPEG", false)
@@ -171,10 +178,10 @@ class Server
     add("1.3.6.1.4.1.1466.115.121.1.38", "OID", true, /\A#{WOID}\z/)
     add("1.3.6.1.4.1.1466.115.121.1.39", "Other Mailbox", true)
     o = add("1.3.6.1.4.1.1466.115.121.1.41", "Postal Address", true)
-    def o.from_s(v)
+    def o.value_from_s(v)
       v.split(/\$/)
     end
-    def o.to_s(v)
+    def o.value_to_s(v)
       return v.join("$") if v.is_a?(Array)
       return v
     end
