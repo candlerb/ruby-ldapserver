@@ -1,6 +1,10 @@
 module LDAP
 class Server
 
+  # A class which describes LDAP SyntaxDescriptions. For now there is
+  # a global pool of Syntax objects (rather than each Schema object
+  # having its own pool)
+
   class Syntax
     attr_reader :oid, :hr, :desc
 
@@ -21,8 +25,9 @@ class Server
     # Create a new Syntax object, given its description string
 
     def self.from_def(str, *args)
-      raise "Bad SyntaxTypeDescription #{str.inspect}" unless LDAPSyntaxDescription =~ str
-      new($1, $2, *args)
+      m = LDAPSyntaxDescription.match(str)
+      raise "Bad SyntaxTypeDescription #{str.inspect}" unless m
+      new(m[1], m[2], *args)
     end
 
     # Convert this object to its description string
@@ -68,7 +73,7 @@ class Server
     # Syntax object associated with this oid.
 
     def self.find(oid)
-      return nil if oid.nil?
+      return oid if oid.nil? or oid.is_a?(LDAP::Server::Syntax)
       return @@syntaxes[oid] if @@syntaxes[oid]
       add(oid)
     end

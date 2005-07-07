@@ -8,6 +8,18 @@ class Server
     def initialize
       @attrtypes = {}		# name/alias => AttributeType instance
       @objectclasses = {}
+
+      # Mandatory items for bootstrapping the server
+      add_objectclass(<<EOS)
+( 2.5.6.0 NAME 'top' DESC 'top of the superclass chain' ABSTRACT MUST objectClass )
+EOS
+      add_attrtype(<<EOS)
+( 2.5.4.0 NAME 'objectClass' DESC 'RFC2256: object classes of the entity'
+ EQUALITY objectIdentifierMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )
+EOS
+puts "@attrtypes = #{@attrtypes.inspect}"
+puts "@objectclasses = #{@objectclasses.inspect}"
+      resolve_oids
     end
 
     # Add an AttributeType to the schema
@@ -23,6 +35,7 @@ class Server
     # Locate an attributetype object by name/alias/oid (or raise exception)
 
     def find_attrtype(n)
+      return n if n.nil? or n.is_a?(LDAP::Server::Schema::AttributeType)
       r = @attrtypes[n.downcase]
       raise LDAP::Server::Result::UndefinedAttributeType, "Unknown AttributeType #{n.inspect}" unless r
       r
@@ -31,6 +44,7 @@ class Server
     # Locate an objectclass object by name/alias/oid (or raise exception)
 
     def find_objectclass(n)
+      return n if n.nil? or n.is_a?(LDAP::Server::Schema::ObjectClass)
       r = @objectclasses[n.downcase]
       raise LDAP::Server::Result::ObjectClassViolation, "Unknown ObjectClass #{n.inspect}" unless r
       r
@@ -46,31 +60,152 @@ class Server
       end
     end
 
+    # Load an OpenLDAP-format schema from a named file
+
+    def load_file(filename)
+      File.open(filename) { |f| load(f) }
+    end
+
+    # Load an OpenLDAP-format schema from a string or IO object (anything
+    # which responds to 'each_line'). Lines starting 'attributetype'
+    # or 'objectclass' contain one of those objects
+
+    def load(str_or_io)
+      meth = :junk_line
+      data = ""
+      str_or_io.each_line do |line|
+        case line
+        when /^\s*#/, /^\s*$/
+          next
+        when /^objectclass\s*(.*)$/
+          send(meth, data)
+          meth = :add_objectclass
+          data = $1
+        when /^attributetype\s*(.*)$/
+          send(meth, data)
+          meth = :add_attrtype
+          data = $1
+        else
+          data << line
+        end
+      end
+      send(meth,data)
+    end
+
+    def junk_line(data)
+      return if data.empty?
+      raise LDAP::Server::Result::InvalidAttributeSyntax,
+        "Expected 'attributetype' or 'objectclass', got #{data}"
+    end
+    private :junk_line
+
     # After loading object classes and attrs: resolve oid strings to point
     # to objects. This will expose schema inconsistencies (e.g. objectclass
-    # has unknown SUP class or points to unknown attributeType)
+    # has unknown SUP class or points to unknown attributeType). However,
+    # unknown Syntaxes just create new Syntax objects.
 
     def resolve_oids
-      @attrtypes.each do |a|
-        if @sup
-          s = find_attrtype(@sup)
+
+      @attrtypes.values.uniq.each do |a|
+        a.instance_eval { @syntax = LDAP::Server::Syntax.find(@syntax) }
+        if a.sup
+          s = find_attrtype(a.sup)
           a.instance_eval { @sup = s }
         end
+        # TODO: equality, ordering, substr
       end
-      @objectclasses.each do |o|
-        if @sup
-          s = @sup.collect { |ss| find_objectclass(ss) }
+
+      @objectclasses.values.uniq.each do |o|
+        if o.sup
+          s = o.sup.collect { |ss| find_objectclass(ss) }
           o.instance_eval { @sup = s }
-        end      
-        if @must
-          s = @must.collect { |ss| find_attrtype(ss) }
+        end
+        if o.must
+          s = o.must.collect { |ss| find_attrtype(ss) }
           o.instance_eval { @must = s }
         end
-        if @may
-          s = @may.collect { |ss| find_attrtype(ss) }
+        if o.may
+          s = o.may.collect { |ss| find_attrtype(ss) }
           o.instance_eval { @may = s }
-        end  
+        end
       end
+
+    end
+
+    # Validate an AV-hash {attr=>[vals], attr=>[vals], ...}
+    # where attr are attribute names, and vals are all strings, e.g.
+    # as provided by an LDAP client.
+    # Return a new hash where 'attr' has been replaced by the canonical
+    # name of the attribute. If 'normalize' is true then the values are
+    # converted into their nearest-equivalent Ruby classes. The
+    # objectClass attribute always has any missing superclasses added;
+    # if 'normalize' then you get an array of ObjectClass objects.
+
+    def validate(av, normalize=false)
+      oc = nil
+      res = {}
+      got_attr = {}
+      av.each do |attr,vals|
+        vals = [] if vals.nil?
+        vals = [vals] unless vals.is_a?(Array)
+        attr = find_attr(attr)
+        got_attr[attr] = true
+
+        if attr.name == 'objectClass'
+          oc = vals.collect do |val|
+            find_objectclass(val)
+          end
+        else
+          v2 = []
+          vals.each do |val|
+            raise LDAP::Server::Result::InvalidAttributeSyntax,
+              "Bad value for #{attr}: #{val.inspect}" unless attr.match(val)
+            raise LDAP::Server::Result::InvalidAttributeSyntax,
+              "Value too long for #{attr}" if attr.maxlen and val.length > attr.maxlen
+            v2 << attr.value_from_s(val) if normalize
+          end
+          res[attr.name] = normalize ? v2 : vals
+        end
+      end
+
+      # Now do objectClass checks.
+      unless oc
+        raise LDAP::Server::Result::ObjectClassViolation,
+          "objectClass attribute missing"
+      end
+
+      # Add superior objectClasses (note: growing an array while you
+      # iterate over it seems to work in ruby-1.8.2 anyway!)
+      oc.each do |objectclass|
+        objectclass.sup.each do |s|
+          oc.push(s) unless oc.include?(s)
+        end
+      end
+      res['objectClass'] = normalize ? oc : oc.collect { |oo| oo.to_s }
+
+      # Ensure that all MUST attributes are present
+      allow_attr = {}
+      oc.each do |objectclass|
+        objectclass.must.each do |m|
+          unless got_attr[m]
+            raise LDAP::Server::Result::ObjectClassViolation,
+              "Attribute #{attr} missing required by objectClass #{objectclass}"
+          end
+          allow_attr[m] = true
+        end
+        objectclass.may.each do |m|
+          allow_attr[m] = true
+        end
+      end
+
+      # Now check all the attributes given are permitted by MUST or MAY
+      got_attr.each do |attr,dummy|
+        unless allow_attr[attr]
+          raise LDAP::Server::Result::ObjectClassViolation, "Attribute #{attr} not permitted by objectClass"
+        end
+      end
+
+      res
     end
 
     #####################################################################
@@ -94,7 +229,7 @@ class Server
 	@equality = m[6]
 	@ordering = m[7]
 	@substr = m[8]
-	@syntax = LDAP::Server::Syntax.find(m[9])
+	@syntax = m[9]
 	@maxlen = m[10] && m[10].to_i
 	@singlevalue = ! m[11].nil?
 	@collective = ! m[12].nil?
@@ -110,7 +245,7 @@ class Server
       end
 
       def to_s
-        (@names && @names[0]) || @oid
+        (@names && @names.first) || @oid
       end
 
       def changed
@@ -123,7 +258,7 @@ class Server
         if @names.nil? or @names.empty?
           # nothing
         elsif @names.size == 1
-          ans << "NAME '#{@names[0]}' "
+          ans << "NAME '#{@names.first}' "
         else
           ans << "NAME ( "
           @names.each { |n| ans << "'#{n}' " }
@@ -174,7 +309,7 @@ class Server
       end
 
       def to_s
-        (@names && @names[0]) || @oid
+        (@names && @names.first) || @oid
       end
 
       def changed
@@ -187,7 +322,7 @@ class Server
         if @names.nil? or @names.empty?
           # nothing
         elsif @names.size == 1
-          ans << "NAME '#{@names[0]}' "
+          ans << "NAME '#{@names.first}' "
         else
           ans << "NAME ( "
           @names.each { |n| ans << "'#{n}' " }
@@ -208,7 +343,7 @@ class Server
         return "#{pfx}#{arr}#{sfx}" unless arr.is_a?(Array)
         a = arr.collect { |elem| elem.to_s }
         if a.size == 1
-          return "#{pfx}#{a[0]}#{sfx}"
+          return "#{pfx}#{a.first}#{sfx}"
         else
           return "#{pfx}( #{a.join(" $ ")} )#{sfx}"
         end
