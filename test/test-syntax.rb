@@ -14,7 +14,7 @@ class SyntaxTest < Test::Unit::TestCase
     assert(!s.match("12A"))
     assert_equal(123, s.value_from_s("123"))
     assert_equal("456", s.value_to_s(456))
-    assert_equal("789", s.value_to_s(789))
+    assert_equal("789", s.value_to_s("789"))
   end
 
   def test_unknown

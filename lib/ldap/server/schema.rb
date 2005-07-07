@@ -6,13 +6,70 @@ class Server
   class Schema
 
     def initialize
-      @attr_types = {}		# name/alias => AttributeType instance
+      @attrtypes = {}		# name/alias => AttributeType instance
+      @objectclasses = {}
     end
+
+    # Add an AttributeType to the schema
 
     def add_attrtype(str)
       a = AttributeType.new(str)
+      @attrtypes[a.oid] = a if a.oid
       a.names.each do |n|
-        @attr_types[n.downcase] = a
+        @attrtypes[n.downcase] = a
+      end
+    end
+
+    # Locate an attributetype object by name/alias/oid (or raise exception)
+
+    def find_attrtype(n)
+      r = @attrtypes[n.downcase]
+      raise LDAP::Server::Result::UndefinedAttributeType, "Unknown AttributeType #{n.inspect}" unless r
+      r
+    end
+
+    # Locate an objectclass object by name/alias/oid (or raise exception)
+
+    def find_objectclass(n)
+      r = @objectclasses[n.downcase]
+      raise LDAP::Server::Result::ObjectClassViolation, "Unknown ObjectClass #{n.inspect}" unless r
+      r
+    end
+
+    # Add an ObjectClass to the schema
+
+    def add_objectclass(str)
+      o = ObjectClass.new(str)
+      @objectclasses[o.oid] = o if o.oid
+      o.names.each do |n|
+        @objectclasses[n.downcase] = o
+      end
+    end
+
+    # After loading object classes and attrs: resolve oid strings to point
+    # to objects. This will expose schema inconsistencies (e.g. objectclass
+    # has unknown SUP class or points to unknown attributeType)
+
+    def resolve_oids
+      @attrtypes.each do |a|
+        if @sup
+          s = find_attrtype(@sup)
+          a.instance_eval { @sup = s }
+        end
+      end
+      @objectclasses.each do |o|
+        if @sup
+          s = @sup.collect { |ss| find_objectclass(ss) }
+          o.instance_eval { @sup = s }
+        end      
+        if @must
+          s = @must.collect { |ss| find_attrtype(ss) }
+          o.instance_eval { @must = s }
+        end
+        if @may
+          s = @may.collect { |ss| find_attrtype(ss) }
+          o.instance_eval { @may = s }
+        end  
       end
     end
 
@@ -53,7 +110,7 @@ class Server
       end
 
       def to_s
-        @oid
+        (@names && @names[0]) || @oid
       end
 
       def changed
@@ -117,11 +174,7 @@ class Server
       end
 
       def to_s
-        if @names && @names[0]
-          @names[0]
-        else
-          @oid
-        end
+        (@names && @names[0]) || @oid
       end
 
       def changed
