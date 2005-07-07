@@ -71,4 +71,12 @@ OC
     assert_equal(["userPassword","telephoneNumber","seeAlso","description"], a.may)
     assert_equal(oc.chomp, a.to_def)
   end
+
+  def test_fullschema
+    s = LDAP::Server::Schema.new
+    s.load_file("core.schema")
+    a = s.find_attrtype("COMMONNAME")
+    assert_equal(LDAP::Server::Schema::AttributeType, a.class)
+    assert_equal("cn", a.name)
+  end
 end

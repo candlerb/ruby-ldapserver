@@ -1,4 +1,5 @@
 require 'ldap/server/syntax'
+require 'ldap/server/result'
 
 module LDAP
 class Server
@@ -17,8 +18,6 @@ EOS
 ( 2.5.4.0 NAME 'objectClass' DESC 'RFC2256: object classes of the entity'
  EQUALITY objectIdentifierMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )
 EOS
-puts "@attrtypes = #{@attrtypes.inspect}"
-puts "@objectclasses = #{@objectclasses.inspect}"
       resolve_oids
     end
 
@@ -37,7 +36,7 @@ puts "@objectclasses = #{@objectclasses.inspect}"
     def find_attrtype(n)
       return n if n.nil? or n.is_a?(LDAP::Server::Schema::AttributeType)
       r = @attrtypes[n.downcase]
-      raise LDAP::Server::Result::UndefinedAttributeType, "Unknown AttributeType #{n.inspect}" unless r
+      raise LDAP::Server::UndefinedAttributeType, "Unknown AttributeType #{n.inspect}" unless r
       r
     end
 
@@ -46,7 +45,7 @@ puts "@objectclasses = #{@objectclasses.inspect}"
     def find_objectclass(n)
       return n if n.nil? or n.is_a?(LDAP::Server::Schema::ObjectClass)
       r = @objectclasses[n.downcase]
-      raise LDAP::Server::Result::ObjectClassViolation, "Unknown ObjectClass #{n.inspect}" unless r
+      raise LDAP::Server::ObjectClassViolation, "Unknown ObjectClass #{n.inspect}" unless r
       r
     end
 
@@ -94,7 +93,7 @@ puts "@objectclasses = #{@objectclasses.inspect}"
 
     def junk_line(data)
       return if data.empty?
-      raise LDAP::Server::Result::InvalidAttributeSyntax,
+      raise LDAP::Server::InvalidAttributeSyntax,
         "Expected 'attributetype' or 'objectclass', got #{data}"
     end
     private :junk_line
@@ -158,9 +157,9 @@ puts "@objectclasses = #{@objectclasses.inspect}"
         else
           v2 = []
           vals.each do |val|
-            raise LDAP::Server::Result::InvalidAttributeSyntax,
+            raise LDAP::Server::InvalidAttributeSyntax,
               "Bad value for #{attr}: #{val.inspect}" unless attr.match(val)
-            raise LDAP::Server::Result::InvalidAttributeSyntax,
+            raise LDAP::Server::InvalidAttributeSyntax,
               "Value too long for #{attr}" if attr.maxlen and val.length > attr.maxlen
             v2 << attr.value_from_s(val) if normalize
           end
@@ -170,7 +169,7 @@ puts "@objectclasses = #{@objectclasses.inspect}"
 
       # Now do objectClass checks.
       unless oc
-        raise LDAP::Server::Result::ObjectClassViolation,
+        raise LDAP::Server::ObjectClassViolation,
           "objectClass attribute missing"
       end
 
@@ -188,7 +187,7 @@ puts "@objectclasses = #{@objectclasses.inspect}"
       oc.each do |objectclass|
         objectclass.must.each do |m|
           unless got_attr[m]
-            raise LDAP::Server::Result::ObjectClassViolation,
+            raise LDAP::Server::ObjectClassViolation,
               "Attribute #{attr} missing required by objectClass #{objectclass}"
           end
           allow_attr[m] = true
@@ -201,7 +200,7 @@ puts "@objectclasses = #{@objectclasses.inspect}"
       # Now check all the attributes given are permitted by MUST or MAY
       got_attr.each do |attr,dummy|
         unless allow_attr[attr]
-          raise LDAP::Server::Result::ObjectClassViolation, "Attribute #{attr} not permitted by objectClass"
+          raise LDAP::Server::ObjectClassViolation, "Attribute #{attr} not permitted by objectClass"
         end
       end
 

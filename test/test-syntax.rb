@@ -32,4 +32,10 @@ class SyntaxTest < Test::Unit::TestCase
     s = LDAP::Server::Syntax.find(nil)
     assert_equal(nil, s)
   end
+
+  def test_from_def
+    s = LDAP::Server::Syntax.from_def("( 1.2.3 DESC 'foobar' )")
+    assert_equal("1.2.3", s.oid)
+    assert_equal("foobar", s.desc)
+  end
 end
