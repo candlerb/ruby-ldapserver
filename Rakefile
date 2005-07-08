@@ -3,7 +3,7 @@ task :default => [:src]
 VER="0.2"
 
 srcball = "ruby-ldapserver-#{VER}.tgz"
-sourcefiles = ["README","COPYING","ChangeLog","examples/README"] + Dir["**/*.rb"]
+sourcefiles = ["README","COPYING","ChangeLog","examples/README","test/core.schema"] + Dir["**/*.rb"]
 
 task :src do
   tmpdir = "ruby-ldapserver-#{VER}"
