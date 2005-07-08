@@ -1,7 +1,7 @@
 #!/usr/local/bin/ruby -w
 
-# This functions like rbdlapd1.rb but uses TOMITA Masahiro's prefork library.
-# Advantages over Ruby threading:
+# This is similar to rbslapd1.rb but here we use TOMITA Masahiro's prefork
+# library. Advantages over Ruby threading:
 # - each client connection is handled in its own process; don't need
 #   to worry about Ruby thread blocking (except if one client issues
 #   overlapping LDAP operations down the same connection, which is uncommon)
@@ -11,10 +11,14 @@
 # Disadvantages:
 # - client connections can't share state in RAM. So our shared directory
 #   now has to be read from disk, and flushed to disk after every update.
+#
+# Additionally, I have added basic schema support. An LDAP v3 client can
+# query the schema remotely. TODO: Add data validation using schema.
 
 $:.unshift('../lib')
 
 require 'ldap/server'
+require 'ldap/server/schema'
 require 'yaml'
 
 $debug = nil # $stderr
@@ -153,6 +157,11 @@ end
 
 directory = Directory.new("ldapdb.yaml")
 
+schema = LDAP::Server::Schema.new
+schema.load_system
+schema.load_file("../test/core.schema")
+schema.resolve_oids
+
 s = LDAP::Server.new(
 	:port			=> 1389,
 	:nodelay		=> true,
@@ -161,7 +170,9 @@ s = LDAP::Server.new(
 #	:ssl_cert_file		=> "cert.pem",
 #	:ssl_on_connect		=> true,
 	:operation_class	=> DirOperation,
-	:operation_args		=> [directory]
+	:operation_args		=> [directory],
+	:schema			=> schema,
+	:namingContexts		=> ['dc=example,dc=com']
 )
 s.run_prefork
 s.join

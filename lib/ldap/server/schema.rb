@@ -13,9 +13,41 @@ class Server
 
   class Schema
 
+    SUBSCHEMA_ENTRY_ATTR = 'cn'
+    SUBSCHEMA_ENTRY_VALUE = 'subschema'
+
     def initialize
       @attrtypes = {}		# name/alias/oid => AttributeType instance
       @objectclasses = {}	# name/alias/oid => ObjectClass instance
+      @subschema_cache = nil
+    end
+
+    # return the DN of the subschema subentry
+
+    def subschema_dn
+      "#{SUBSCHEMA_ENTRY_ATTR}=#{SUBSCHEMA_ENTRY_VALUE}"
+    end
+
+    # Return an av hash object giving the subschema subentry. This is cached, so
+    # call Schema#changed if it needs to be rebuilt
+
+    def subschema_subentry
+      @subschema_cache ||= {
+	'objectClass' => ['top','subschema','extensibleObject'],
+	SUBSCHEMA_ENTRY_ATTR => [SUBSCHEMA_ENTRY_VALUE],
+	'objectClasses' => all_objectclasses.collect { |s| s.to_def },
+	'attributeTypes' => all_attrtypes.collect { |s| s.to_def },
+	'ldapSyntaxes' => LDAP::Server::Syntax.all_syntaxes.collect { |s| s.to_def },
+	#'matchingRules' =>
+	#'matchingRuleUse' =>
+      }
+    end
+
+    # Clear the subschema subentry cache, so the next time someone requests
+    # it, it will be rebuilt
+
+    def changed
+      @subschema_cache = nil
     end
 
     # Add an AttributeType to the schema
@@ -185,7 +217,7 @@ EOS
           s = find_attrtype(a.sup)
           a.instance_eval {
             @sup = s
-            # ??? inherit properties (FIXME: This breaks to_def)
+            # inherit properties (FIXME: This breaks to_def)
             @equality ||= s.equality
             @ordering ||= s.ordering
             @substr ||= s.substr

@@ -5,6 +5,8 @@ require 'openssl'
 module LDAP
 class Server
 
+  attr_accessor :root_dse
+
   DEFAULT_OPT = {
       :port=>389,
       :nodelay=>true,
@@ -16,6 +18,8 @@ class Server
   #   :operation_args=>[...]			- args to Operation.new
   #   :ssl_key_file=>pem, :ssl_cert_file=>pem	- enable SSL
   #   :ssl_ca_path=>directory			- verify peer certificates
+  #   :schema=>Schema				- Schema object
+  #   :namingContexts=>[dn, ...]		- base DN(s) we answer
 
   def initialize(opt = DEFAULT_OPT)
     @opt = opt
@@ -23,6 +27,17 @@ class Server
     @opt[:operation_class] ||= LDAP::Server::Operation
     @opt[:operation_args] ||= []
     LDAP::Server.ssl_prepare(@opt)
+    @schema = opt[:schema]	# may be nil
+    @root_dse = Hash.new { |h,k| h[k] = [] }.merge({
+	'objectClass' => ['top','openLDAProotDSE','extensibleObject'],
+	'supportedLDAPVersion' => ['3'],
+	#'altServer' =>
+	#'supportedExtension' =>
+	#'supportedControl' =>
+	#'supportedSASLMechanisms' =>
+    })
+    @root_dse['subschemaSubentry'] = [@schema.subschema_dn] if @schema
+    @root_dse['namingContexts'] = opt[:namingContexts] if opt[:namingContexts]
   end
 
   # create opt[:ssl_ctx] from the other ssl options
@@ -68,41 +83,6 @@ class Server
   def stop
     @thread.raise Interrupt
     @thread.join
-  end
-
-  def setup_root
-    # set up a minimal root DSE
-
-    @root_dse = {
-      # 
-      'objectClass' => ['top','extensibleObject'],
-      # RFC 2251
-      'namingContexts' => [],
-      'subschemaSubentry' => ["cn=Subschema"],	# see also...
-      'altServer' => [],
-      'supportedExtension' => [],
-      'supportedControl' => [],
-      'supportedSASLMechanisms' => [],
-      'supportedLDAPVersion' => ['3'],	# note 1
-    }
-    # note 1: despite LDAP defining syntax types and associating them
-    # with attributes, everything is encoded as a string
-
-    @subschema = {
-      'objectClass' => ['top','extensibleObject'],
-      'cn' => ['Subschema'],				# ...see also
-      'objectClasses' => [
-        "( 2.5.6.0 NAME 'top' DESC 'top of the superclass chain' ABSTRACT MUST objectClass )",
-        "( 1.3.6.1.4.1.1466.101.120.111 NAME 'extensibleObject' DESC 'RFC2252: extensible object' SUP top AUXILIARY )",
-      ],
-      'attributeTypes' => [],
-      'matchingRules' => [],
-      'matchingRuleUse' => [],
-      'dITStructureRules' => [],
-      'dITContentRules' => [],
-      'nameForms' => [],
-      'ldapSyntaxes' => [],
-    }
   end
 
 end # class Server

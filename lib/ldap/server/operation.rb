@@ -29,10 +29,8 @@ class Server
         # protocolOp,
         # controls [0] OPTIONAL,
       ])
-    end
-
-    def server
-      @connection.opt[:server]
+      @schema = @connection.opt[:schema]
+      @server = @connection.opt[:server]
     end
 
     ##################################################
@@ -80,6 +78,8 @@ class Server
     end
 
     # Send a found entry. Avs are {attr1=>val1, attr2=>[val2,val3]}
+    # TODO: If schema given, return operational attributes only if
+    # explicitly requested
 
     def send_SearchResultEntry(dn, avs, opt={})
       @rescount += 1
@@ -217,6 +217,16 @@ class Server
       @sizelimit = server_sizelimit
       @sizelimit = client_sizelimit if client_sizelimit > 0 and
                    (@sizelimit.nil? or client_sizelimit < @sizelimit)
+
+      if baseObject.empty? and scope == BaseObject
+        send_SearchResultEntry("", @server.root_dse) if LDAP::Server::Filter.run(filter, @server.root_dse)
+        send_SearchResultDone(0)
+        return
+      elsif @schema and baseObject == @schema.subschema_dn
+        send_SearchResultEntry(baseObject, @schema.subschema_subentry) if LDAP::Server::Filter.run(filter, @schema.subschema_subentry)
+        send_SearchResultDone(0)
+        return
+      end
 
       t = server_timelimit || 10
       t = client_timelimit if client_timelimit > 0 and client_timelimit < t

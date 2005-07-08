@@ -78,6 +78,12 @@ class Server
       add(oid)
     end
 
+    # Return all known syntax objects
+
+    def self.all_syntaxes
+      @@syntaxes.values.uniq
+    end
+
     # Shared constants for regexp-based syntax parsers
 
     KEYSTR = "[a-zA-Z][a-zA-Z0-9;-]*"
