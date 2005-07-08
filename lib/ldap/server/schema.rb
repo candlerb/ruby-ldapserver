@@ -4,11 +4,18 @@ require 'ldap/server/result'
 module LDAP
 class Server
 
+  # TODO: Add a backwards-compatible API to LDAP::Schema
+
+  # This object represents an LDAP schema: that is, a collection of
+  # objectclasses and attributetypes. Methods are provided for loading
+  # the schema (from a string or a disk file), and validating an av-hash
+  # against it.
+
   class Schema
 
     def initialize
-      @attrtypes = {}		# name/alias => AttributeType instance
-      @objectclasses = {}
+      @attrtypes = {}		# name/alias/oid => AttributeType instance
+      @objectclasses = {}	# name/alias/oid => ObjectClass instance
     end
 
     # Add an AttributeType to the schema
@@ -72,6 +79,14 @@ class Server
     # or 'objectclass' contain one of those objects. Does not implement
     # named objectIdentifier prefixes (used in the dyngroup.schema file
     # supplied with openldap, but not documented in RFC2252)
+    #
+    # Note: RFC2252 is strict about the order in which the elements appear,
+    # and so are we, but OpenLDAP is not. This means that a schema which
+    # works in OpenLDAP might not load here. For example, RFC2252 says
+    # that in an objectclass description, "SUP" must come before "MAY";
+    # if they are the other way round, our regexp-based parser will not
+    # accept it. The solution is simply to modify the definition so that
+    # the elements appear in the correct order.
 
     def load(str_or_io)
       meth = :junk_line
@@ -81,13 +96,13 @@ class Server
         when /^\s*#/, /^\s*$/
           next
         when /^objectclass\s*(.*)$/i
+          m = $~
           send(meth, data)
-          meth = :add_objectclass
-          data = $1
+          meth, data = :add_objectclass, m[1]
         when /^attributetype\s*(.*)$/i
+          m = $~
           send(meth, data)
-          meth = :add_attrtype
-          data = $1
+          meth, data = :add_attrtype, m[1]
         else
           data << line
         end
@@ -106,10 +121,11 @@ class Server
     # Load in the base set of objectclasses and attributetypes, being
     # the same set as OpenLDAP preloads internally. Includes objectclasses
     # 'top', 'objectclass'; attributetypes 'objectclass' , 'cn',
-    # 'userPassword' and 'distinguishedName'; plus extras needed for
-    # publishing a v3 schema via LDAP
+    # 'userPassword' and 'distinguishedName'; common operational attributes
+    # such as 'modifyTimestamp'; plus extras needed for publishing a v3
+    # schema via LDAP
 
-    def load_base
+    def load_system
       load(<<EOS)
 attributetype ( 1.3.6.1.4.1.250.1.57 NAME 'labeledURI' DESC 'RFC2079: Uniform Resource Identifier with optional label' EQUALITY caseExactMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
 attributetype ( 2.5.4.35 NAME 'userPassword' DESC 'RFC2256/2307: password of user' EQUALITY octetStringMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.40{128} )
@@ -214,17 +230,19 @@ EOS
       oc = nil
       res = {}
       got_attr = {}
+
+      # FIXME: I don't know if these are the right results to return
+      # for the various types of validation errors
+
       av.each do |attr,vals|
-        vals = [] if vals.nil?
-        vals = [vals] unless vals.is_a?(Array)
-        attr = find_attr(attr)
+        attr = find_attr(attr)  # convert to AttributeType object
         got_attr[attr] = true
 
-        # FIXME: I don't know if these are the right results to return
-        # for the various types of validation errors
-
+        vals = [vals] unless vals.is_a?(Array)
         raise LDAP::Server::ObjectClassViolation,
           "Attribute #{attr} is SINGLE-VALUE" if attr.singlevalue and vals.size != 1
+        raise LDAP::Server::InvalidAttributeSyntax,
+          "Empty value list for attribute #{attr}" if vals.empty?
 
         if attr.name == 'objectClass'
           oc = vals.collect do |val|
@@ -233,13 +251,14 @@ EOS
         else
           v2 = []
           vals.each do |val|
-            # ?? should we always reject val.nil? and val == ""
+            raise LDAP::Server::InvalidAttributeSyntax,
+              "Nil or empty value for attribute #{attr}" if val.nil? or val.empty?
             raise LDAP::Server::ConstraintViolation,
               "Cannot modify #{attr}" if attr.nousermod
             raise LDAP::Server::InvalidAttributeSyntax,
               "Bad value for #{attr}: #{val.inspect}" if attr.syntax and ! attr.syntax.match(val)
             raise LDAP::Server::InvalidAttributeSyntax,
-              "Value too long for #{attr}" if attr.maxlen and val.length > attr.maxlen
+              "Value too long for #{attr} (max #{attr.maxlen})" if attr.maxlen and val.length > attr.maxlen
             v2 << attr.value_from_s(val) if normalize
           end
           res[attr.name] = normalize ? v2 : vals
@@ -261,13 +280,17 @@ EOS
       end
       res['objectClass'] = normalize ? oc : oc.collect { |oo| oo.to_s }
 
+      # Check that at least one structural objectClass is present
+      unless oc.find { |s| s.struct == :structural }
+        raise LDAP::Server::ObjectClassViolation,
+          "Entry must have at least one structural objectClass"
+      end
+
       # Ensure that all MUST attributes are present
       allow_attr = {}
       oc.each do |objectclass|
         objectclass.must.each do |m|
           unless got_attr[m]
-            raise LDAP::Server::ObjectClassViolation,
-              "Attribute #{attr} missing required by objectClass #{objectclass}"
           end
           allow_attr[m] = true
         end

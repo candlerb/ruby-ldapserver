@@ -72,9 +72,9 @@ OC
     assert_equal(oc.chomp, a.to_def)
   end
 
-  def test_fullschema
+  def test_loadschema
     s = LDAP::Server::Schema.new
-    s.load_base
+    s.load_system
     s.load_file("core.schema")
     s.resolve_oids
     a = s.find_attrtype("objectclass")
@@ -84,7 +84,11 @@ OC
     assert_equal("cn", a.name)
     a = s.find_attrtype("COUNTRYname")
     assert_equal("c", a.name)
+    # I modified core.schema so that countryName has the appropriate syntax
     assert(a.syntax.match("GB"))
     assert(!a.syntax.match("ABC"))
+  end
+
+  def test_validate
   end
 end
