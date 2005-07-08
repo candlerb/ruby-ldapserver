@@ -74,9 +74,17 @@ OC
 
   def test_fullschema
     s = LDAP::Server::Schema.new
+    s.load_base
     s.load_file("core.schema")
+    s.resolve_oids
+    a = s.find_attrtype("objectclass")
+    assert_equal("objectClass", a.name)
     a = s.find_attrtype("COMMONNAME")
     assert_equal(LDAP::Server::Schema::AttributeType, a.class)
     assert_equal("cn", a.name)
+    a = s.find_attrtype("COUNTRYname")
+    assert_equal("c", a.name)
+    assert(a.syntax.match("GB"))
+    assert(!a.syntax.match("ABC"))
   end
 end

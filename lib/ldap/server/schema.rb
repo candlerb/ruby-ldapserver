@@ -9,16 +9,6 @@ class Server
     def initialize
       @attrtypes = {}		# name/alias => AttributeType instance
       @objectclasses = {}
-
-      # Mandatory items for bootstrapping the server
-      add_objectclass(<<EOS)
-( 2.5.6.0 NAME 'top' DESC 'top of the superclass chain' ABSTRACT MUST objectClass )
-EOS
-      add_attrtype(<<EOS)
-( 2.5.4.0 NAME 'objectClass' DESC 'RFC2256: object classes of the entity'
- EQUALITY objectIdentifierMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )
-EOS
-      resolve_oids
     end
 
     # Add an AttributeType to the schema
@@ -40,13 +30,10 @@ EOS
       r
     end
 
-    # Locate an objectclass object by name/alias/oid (or raise exception)
+    # Return array of all AttributeType objects in this schema
 
-    def find_objectclass(n)
-      return n if n.nil? or n.is_a?(LDAP::Server::Schema::ObjectClass)
-      r = @objectclasses[n.downcase]
-      raise LDAP::Server::ObjectClassViolation, "Unknown ObjectClass #{n.inspect}" unless r
-      r
+    def all_attrtypes
+      @attrtypes.values.uniq
     end
 
     # Add an ObjectClass to the schema
@@ -59,7 +46,22 @@ EOS
       end
     end
 
-    # Load an OpenLDAP-format schema from a named file
+    # Locate an objectclass object by name/alias/oid (or raise exception)
+
+    def find_objectclass(n)
+      return n if n.nil? or n.is_a?(LDAP::Server::Schema::ObjectClass)
+      r = @objectclasses[n.downcase]
+      raise LDAP::Server::ObjectClassViolation, "Unknown ObjectClass #{n.inspect}" unless r
+      r
+    end
+
+    # Return array of all ObjectClass objects in this schema
+
+    def all_objectclasses
+      @objectclasses.values.uniq
+    end
+
+    # Load an OpenLDAP-format schema from a named file (see notes under 'load')
 
     def load_file(filename)
       File.open(filename) { |f| load(f) }
@@ -67,7 +69,9 @@ EOS
 
     # Load an OpenLDAP-format schema from a string or IO object (anything
     # which responds to 'each_line'). Lines starting 'attributetype'
-    # or 'objectclass' contain one of those objects
+    # or 'objectclass' contain one of those objects. Does not implement
+    # named objectIdentifier prefixes (used in the dyngroup.schema file
+    # supplied with openldap, but not documented in RFC2252)
 
     def load(str_or_io)
       meth = :junk_line
@@ -76,11 +80,11 @@ EOS
         case line
         when /^\s*#/, /^\s*$/
           next
-        when /^objectclass\s*(.*)$/
+        when /^objectclass\s*(.*)$/i
           send(meth, data)
           meth = :add_objectclass
           data = $1
-        when /^attributetype\s*(.*)$/
+        when /^attributetype\s*(.*)$/i
           send(meth, data)
           meth = :add_attrtype
           data = $1
@@ -89,6 +93,7 @@ EOS
         end
       end
       send(meth,data)
+      self
     end
 
     def junk_line(data)
@@ -98,6 +103,59 @@ EOS
     end
     private :junk_line
 
+    # Load in the base set of objectclasses and attributetypes, being
+    # the same set as OpenLDAP preloads internally. Includes objectclasses
+    # 'top', 'objectclass'; attributetypes 'objectclass' , 'cn',
+    # 'userPassword' and 'distinguishedName'; plus extras needed for
+    # publishing a v3 schema via LDAP
+
+    def load_base
+      load(<<EOS)
+attributetype ( 1.3.6.1.4.1.250.1.57 NAME 'labeledURI' DESC 'RFC2079: Uniform Resource Identifier with optional label' EQUALITY caseExactMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+attributetype ( 2.5.4.35 NAME 'userPassword' DESC 'RFC2256/2307: password of user' EQUALITY octetStringMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.40{128} )
+attributetype ( 2.5.4.3 NAME ( 'cn' 'commonName' ) DESC 'RFC2256: common name(s) for which the entity is known by' SUP name )
+attributetype ( 2.5.4.41 NAME 'name' DESC 'RFC2256: common supertype of name attributes' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{32768} )
+attributetype ( 2.5.4.49 NAME 'distinguishedName' DESC 'RFC2256: common supertype of DN attributes' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+attributetype ( 2.16.840.1.113730.3.1.34 NAME 'ref' DESC 'namedref: subordinate referral URL' EQUALITY caseExactMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 USAGE distributedOperation )
+attributetype ( 2.5.4.1 NAME ( 'aliasedObjectName' 'aliasedEntryName' ) DESC 'RFC2256: name of aliased object' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE )
+attributetype ( 1.3.6.1.4.1.1466.101.120.16 NAME 'ldapSyntaxes' DESC 'RFC2252: LDAP syntaxes' EQUALITY objectIdentifierFirstComponentMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.54 USAGE directoryOperation )
+attributetype ( 2.5.21.8 NAME 'matchingRuleUse' DESC 'RFC2252: matching rule uses' EQUALITY objectIdentifierFirstComponentMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.31 USAGE directoryOperation )
+attributetype ( 2.5.21.6 NAME 'objectClasses' DESC 'RFC2252: object classes' EQUALITY objectIdentifierFirstComponentMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.37 USAGE directoryOperation )
+attributetype ( 2.5.21.5 NAME 'attributeTypes' DESC 'RFC2252: attribute types' EQUALITY objectIdentifierFirstComponentMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.3 USAGE directoryOperation )
+attributetype ( 2.5.21.4 NAME 'matchingRules' DESC 'RFC2252: matching rules' EQUALITY objectIdentifierFirstComponentMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.30 USAGE directoryOperation )
+attributetype ( 1.3.6.1.1.5 NAME 'vendorVersion' DESC 'RFC3045: version of implementation' EQUALITY caseExactMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE NO-USER-MODIFICATION USAGE dSAOperation )
+attributetype ( 1.3.6.1.1.4 NAME 'vendorName' DESC 'RFC3045: name of implementation vendor' EQUALITY caseExactMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE NO-USER-MODIFICATION USAGE dSAOperation )
+attributetype ( 1.3.6.1.4.1.4203.1.3.5 NAME 'supportedFeatures' DESC 'features supported by the server' EQUALITY objectIdentifierMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 USAGE dSAOperation )
+attributetype ( 1.3.6.1.4.1.1466.101.120.14 NAME 'supportedSASLMechanisms' DESC 'RFC2252: supported SASL mechanisms' SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 USAGE dSAOperation )
+attributetype ( 1.3.6.1.4.1.1466.101.120.15 NAME 'supportedLDAPVersion' DESC 'RFC2252: supported LDAP versions' SYNTAX 1.3.6.1.4.1.1466.115.121.1.27 USAGE dSAOperation )
+attributetype ( 1.3.6.1.4.1.1466.101.120.7 NAME 'supportedExtension' DESC 'RFC2252: supported extended operations' SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 USAGE dSAOperation )
+attributetype ( 1.3.6.1.4.1.1466.101.120.13 NAME 'supportedControl' DESC 'RFC2252: supported controls' SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 USAGE dSAOperation )
+attributetype ( 1.3.6.1.4.1.1466.101.120.5 NAME 'namingContexts' DESC 'RFC2252: naming contexts' SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 USAGE dSAOperation )
+attributetype ( 1.3.6.1.4.1.1466.101.120.6 NAME 'altServer' DESC 'RFC2252: alternative servers' SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 USAGE dSAOperation )
+attributetype ( 2.5.18.10 NAME 'subschemaSubentry' DESC 'RFC2252: name of controlling subschema entry' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
+attributetype ( 2.5.18.9 NAME 'hasSubordinates' DESC 'X.501: entry has children' EQUALITY booleanMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.7 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
+attributetype ( 2.5.18.4 NAME 'modifiersName' DESC 'RFC2252: name of last modifier' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
+attributetype ( 2.5.18.3 NAME 'creatorsName' DESC 'RFC2252: name of creator' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
+attributetype ( 2.5.18.2 NAME 'modifyTimestamp' DESC 'RFC2252: time which object was last modified' EQUALITY generalizedTimeMatch ORDERING generalizedTimeOrderingMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.24 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
+attributetype ( 2.5.18.1 NAME 'createTimestamp' DESC 'RFC2252: time which object was created' EQUALITY generalizedTimeMatch ORDERING generalizedTimeOrderingMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.24 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
+attributetype ( 2.5.21.9 NAME 'structuralObjectClass' DESC 'X.500(93): structural object class of entry' EQUALITY objectIdentifierMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
+attributetype ( 2.5.4.0 NAME 'objectClass' DESC 'RFC2256: object classes of the entity' EQUALITY objectIdentifierMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )
+# These ones aren't published by OpenLDAP, but are referenced by the 'subschema' objectclass
+attributetype ( 2.5.21.1 NAME 'dITStructureRules' EQUALITY integerFirstComponentMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.17 USAGE directoryOperation )
+attributetype ( 2.5.21.7 NAME 'nameForms' EQUALITY objectIdentifierFirstComponentMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.35 USAGE directoryOperation )
+attributetype ( 2.5.21.2 NAME 'dITContentRules' EQUALITY objectIdentifierFirstComponentMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.16 USAGE directoryOperation )
+
+objectclass ( 2.5.20.1 NAME 'subschema' DESC 'RFC2252: controlling subschema (sub)entry' AUXILIARY MAY ( dITStructureRules $ nameForms $ ditContentRules $ objectClasses $ attributeTypes $ matchingRules $ matchingRuleUse ) )
+#Don't have definition for subtreeSpecification:
+#objectClass ( 2.5.17.0 NAME 'subentry' SUP top STRUCTURAL MUST ( cn $ subtreeSpecification ) )
+objectClass ( 1.3.6.1.4.1.4203.1.4.1 NAME ( 'OpenLDAProotDSE' 'LDAProotDSE' ) DESC 'OpenLDAP Root DSE object' SUP top STRUCTURAL MAY cn )
+objectClass ( 2.16.840.1.113730.3.2.6 NAME 'referral' DESC 'namedref: named subordinate referral' SUP top STRUCTURAL MUST ref )
+objectClass ( 2.5.6.1 NAME 'alias' DESC 'RFC2256: an alias' SUP top STRUCTURAL MUST aliasedObjectName )
+objectClass ( 1.3.6.1.4.1.1466.101.120.111 NAME 'extensibleObject' DESC 'RFC2252: extensible object' SUP top AUXILIARY )
+objectClass ( 2.5.6.0 NAME 'top' DESC 'top of the superclass chain' ABSTRACT MUST objectClass )
+EOS
+    end
+
     # After loading object classes and attrs: resolve oid strings to point
     # to objects. This will expose schema inconsistencies (e.g. objectclass
     # has unknown SUP class or points to unknown attributeType). However,
@@ -105,16 +163,28 @@ EOS
 
     def resolve_oids
 
-      @attrtypes.values.uniq.each do |a|
+      all_attrtypes.each do |a|
         a.instance_eval { @syntax = LDAP::Server::Syntax.find(@syntax) }
         if a.sup
           s = find_attrtype(a.sup)
-          a.instance_eval { @sup = s }
+          a.instance_eval {
+            @sup = s
+            # ??? inherit properties (FIXME: This breaks to_def)
+            @equality ||= s.equality
+            @ordering ||= s.ordering
+            @substr ||= s.substr
+            @syntax ||= s.syntax
+            @maxlen ||= s.maxlen
+            @singlevalue ||= s.singlevalue
+            @collective ||= s.collective
+            @nousermod ||= s.nousermod
+            @usage ||= s.usage
+          }
         end
         # TODO: equality, ordering, substr
       end
 
-      @objectclasses.values.uniq.each do |o|
+      all_objectclasses.each do |o|
         if o.sup
           s = o.sup.collect { |ss| find_objectclass(ss) }
           o.instance_eval { @sup = s }
@@ -150,6 +220,12 @@ EOS
         attr = find_attr(attr)
         got_attr[attr] = true
 
+        # FIXME: I don't know if these are the right results to return
+        # for the various types of validation errors
+
+        raise LDAP::Server::ObjectClassViolation,
+          "Attribute #{attr} is SINGLE-VALUE" if attr.singlevalue and vals.size != 1
+
         if attr.name == 'objectClass'
           oc = vals.collect do |val|
             find_objectclass(val)
@@ -157,8 +233,11 @@ EOS
         else
           v2 = []
           vals.each do |val|
+            # ?? should we always reject val.nil? and val == ""
+            raise LDAP::Server::ConstraintViolation,
+              "Cannot modify #{attr}" if attr.nousermod
             raise LDAP::Server::InvalidAttributeSyntax,
-              "Bad value for #{attr}: #{val.inspect}" unless attr.match(val)
+              "Bad value for #{attr}: #{val.inspect}" if attr.syntax and ! attr.syntax.match(val)
             raise LDAP::Server::InvalidAttributeSyntax,
               "Value too long for #{attr}" if attr.maxlen and val.length > attr.maxlen
             v2 << attr.value_from_s(val) if normalize

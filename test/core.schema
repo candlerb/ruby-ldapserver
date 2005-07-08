@@ -60,16 +60,16 @@
 #
 
 # system schema
-attributetype ( 2.5.4.0 NAME 'objectClass'
-	DESC 'RFC2256: object classes of the entity'
-	EQUALITY objectIdentifierMatch
-	SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )
+#attributetype ( 2.5.4.0 NAME 'objectClass'
+#	DESC 'RFC2256: object classes of the entity'
+#	EQUALITY objectIdentifierMatch
+#	SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )
 
 # system schema
-attributetype ( 2.5.4.1 NAME ( 'aliasedObjectName' 'aliasedEntryName' )
-	DESC 'RFC2256: name of aliased object'
-	EQUALITY distinguishedNameMatch
-	SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE )
+#attributetype ( 2.5.4.1 NAME ( 'aliasedObjectName' 'aliasedEntryName' )
+#	DESC 'RFC2256: name of aliased object'
+#	EQUALITY distinguishedNameMatch
+#	SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE )
 
 attributetype ( 2.5.4.2 NAME 'knowledgeInformation'
 	DESC 'RFC2256: knowledge information'
@@ -77,9 +77,9 @@ attributetype ( 2.5.4.2 NAME 'knowledgeInformation'
 	SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{32768} )
 
 # system schema
-attributetype ( 2.5.4.3 NAME ( 'cn' 'commonName' )
-	DESC 'RFC2256: common name(s) for which the entity is known by'
-	SUP name )
+#attributetype ( 2.5.4.3 NAME ( 'cn' 'commonName' )
+#	DESC 'RFC2256: common name(s) for which the entity is known by'
+#	SUP name )
 
 attributetype ( 2.5.4.4 NAME ( 'sn' 'surname' )
 	DESC 'RFC2256: last (family) name(s) for which the entity is known by'
@@ -93,7 +93,9 @@ attributetype ( 2.5.4.5 NAME 'serialNumber'
 
 attributetype ( 2.5.4.6 NAME ( 'c' 'countryName' )
 	DESC 'RFC2256: ISO-3166 country 2-letter code'
-	SUP name SINGLE-VALUE )
+	EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.11
+	SINGLE-VALUE )
 
 attributetype ( 2.5.4.7 NAME ( 'l' 'localityName' )
 	DESC 'RFC2256: locality which this object resides in'
@@ -236,10 +238,10 @@ attributetype ( 2.5.4.34 NAME 'seeAlso'
 	SUP distinguishedName )
 
 # system schema
-attributetype ( 2.5.4.35 NAME 'userPassword'
-	DESC 'RFC2256/2307: password of user'
-	EQUALITY octetStringMatch
-	SYNTAX 1.3.6.1.4.1.1466.115.121.1.40{128} )
+#attributetype ( 2.5.4.35 NAME 'userPassword'
+#	DESC 'RFC2256/2307: password of user'
+#	EQUALITY octetStringMatch
+#	SYNTAX 1.3.6.1.4.1.1466.115.121.1.40{128} )
 
 # Must be transferred using ;binary
 # with certificateExactMatch rule (per X.509)
@@ -271,10 +273,10 @@ attributetype ( 2.5.4.40 NAME 'crossCertificatePair'
 	SYNTAX 1.3.6.1.4.1.1466.115.121.1.10 )
 
 # 2.5.4.41 is defined above as it's used for subtyping
-attributetype ( 2.5.4.41 NAME 'name'
-	EQUALITY caseIgnoreMatch
-	SUBSTR caseIgnoreSubstringsMatch
-	SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{32768} )
+#attributetype ( 2.5.4.41 NAME 'name'
+#	EQUALITY caseIgnoreMatch
+#	SUBSTR caseIgnoreSubstringsMatch
+#	SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{32768} )
 
 attributetype ( 2.5.4.42 NAME ( 'givenName' 'gn' )
 	DESC 'RFC2256: first name(s) for which the entity is known by'
@@ -310,9 +312,9 @@ attributetype ( 2.5.4.48 NAME 'protocolInformation'
 	SYNTAX 1.3.6.1.4.1.1466.115.121.1.42 )
 
 # 2.5.4.49 is defined above as it's used for subtyping
-attributetype ( 2.5.4.49 NAME 'distinguishedName'
-	EQUALITY distinguishedNameMatch
-	SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+#attributetype ( 2.5.4.49 NAME 'distinguishedName'
+#	EQUALITY distinguishedNameMatch
+#	SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
 
 attributetype ( 2.5.4.50 NAME 'uniqueMember'
 	DESC 'RFC2256: unique member of a group'
@@ -343,10 +345,10 @@ attributetype ( 2.5.4.54 NAME 'dmdName'
 # Standard object classes from RFC2256
 
 # system schema
-objectclass ( 2.5.6.1 NAME 'alias'
-	DESC 'RFC2256: an alias'
-	SUP top STRUCTURAL
-	MUST aliasedObjectName )
+#objectclass ( 2.5.6.1 NAME 'alias'
+#	DESC 'RFC2256: an alias'
+#	SUP top STRUCTURAL
+#	MUST aliasedObjectName )
 
 objectclass ( 2.5.6.2 NAME 'country'
 	DESC 'RFC2256: a country'
@@ -512,10 +514,10 @@ objectclass ( 2.5.6.23 NAME 'deltaCRL'
 #
 # Standard Track URI label schema from RFC 2079
 # system schema
-attributetype ( 1.3.6.1.4.1.250.1.57 NAME 'labeledURI'
-	DESC 'RFC2079: Uniform Resource Identifier with optional label'
-	EQUALITY caseExactMatch
-	SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+#attributetype ( 1.3.6.1.4.1.250.1.57 NAME 'labeledURI'
+#	DESC 'RFC2079: Uniform Resource Identifier with optional label'
+#	EQUALITY caseExactMatch
+#	SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
 
 objectclass ( 1.3.6.1.4.1.250.3.15 NAME 'labeledURIObject'
 	DESC 'RFC2079: object that contains the URI attribute type'
