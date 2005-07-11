@@ -266,17 +266,18 @@ class TestLdap < Test::Unit::TestCase
     assert_equal([:search, "dc=localhost, dc=localdomain",
       LDAP::Server::WholeSubtree,
       LDAP::Server::NeverDerefAliases,
-      [:true], nil], MockOperation.lastop)
+      [:true], []], MockOperation.lastop)
     req("search2")
+    dm = LDAP::Server::MatchingRule::DefaultMatch
     assert_equal([:search, "dc=localhost, dc=localdomain",
       LDAP::Server::BaseObject,
       LDAP::Server::NeverDerefAliases,
-      [:and, [:eq, "cn", "foo"],
+      [:and, [:eq, "cn", dm, "foo"],
              [:or,  [:not, [:present, "sn"]],
-                    [:ge, "ou", "baz"],
-                    [:le, "o", "z"],
-                    [:approx, "cn", "brian"],
-                    [:substrings, "cn", [:any, "and"], [:final, "er"]],
+                    [:ge, "ou", dm, "baz"],
+                    [:le, "o", dm, "z"],
+                    [:approx, "cn", dm, "brian"],
+                    [:substrings, "cn", dm, nil, "and", "er"],
              ],
       ], ["a","b"]], MockOperation.lastop)
   end

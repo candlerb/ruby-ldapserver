@@ -10,12 +10,13 @@ class Server
 
     # Create a new Syntax object
 
-    def initialize(oid, desc=nil, hr=false, re=nil)
+    def initialize(oid, desc=nil, hr=false, re=nil, &blk)
       @oid = oid
       @desc = desc
       @hr = hr	# human-readable?
       @re = re  # regular expression for parsing
       @def = nil
+      instance_eval(&blk) if blk
     end
 
     def to_s
@@ -24,10 +25,11 @@ class Server
 
     # Create a new Syntax object, given its description string
 
-    def self.from_def(str, *args)
+    def self.from_def(str, *args, &blk)
       m = LDAPSyntaxDescription.match(str)
-      raise "Bad SyntaxTypeDescription #{str.inspect}" unless m
-      new(m[1], m[2], *args)
+      raise LDAP::ResultError::InvalidAttributeSyntax,
+        "Bad SyntaxTypeDescription #{str.inspect}" unless m
+      new(m[1], m[2], *args, &blk)
     end
 
     # Convert this object to its description string
@@ -64,8 +66,8 @@ class Server
 
     # Add a new syntax definition
 
-    def self.add(*args)
-      s = new(*args)
+    def self.add(*args, &blk)
+      s = new(*args, &blk)
       @@syntaxes[s.oid] = s
     end
 
@@ -127,13 +129,14 @@ class Server
     add("1.3.6.1.4.1.1466.115.121.1.6", "Bit String", true, /\A'([01]*)'B\z/)
     # FIXME: convert to FixNum?
 
-    o = add("1.3.6.1.4.1.1466.115.121.1.7", "Boolean", true, /\A(TRUE|FALSE)\z/)
-    def o.value_to_s(v)
-      return v if v.is_a?(string)
-      v ? "TRUE" : "FALSE"
-    end
-    def o.value_from_s(v)
-      v.upcase == "TRUE"
+    add("1.3.6.1.4.1.1466.115.121.1.7", "Boolean", true, /\A(TRUE|FALSE)\z/) do
+      def self.value_to_s(v)
+        return v if v.is_a?(string)
+        v ? "TRUE" : "FALSE"
+      end
+      def self.value_from_s(v)
+        v.upcase == "TRUE"
+      end
     end
 
     add("1.3.6.1.4.1.1466.115.121.1.8", "Certificate", false)
@@ -149,11 +152,13 @@ class Server
     add("1.3.6.1.4.1.1466.115.121.1.24", "Generalized Time", true)
     # FIXME: Validate Generalized Time (find X.208) and convert to/from Ruby
     add("1.3.6.1.4.1.1466.115.121.1.26", "IA5 String", true)
-    o = add("1.3.6.1.4.1.1466.115.121.1.27", "Integer", true, /\A\d+\z/)
-    def o.value_from_s(v)
-      v.to_i
+    add("1.3.6.1.4.1.1466.115.121.1.27", "Integer", true, /\A\d+\z/) do
+      def self.value_from_s(v)
+        v.to_i
+      end
     end
     add("1.3.6.1.4.1.1466.115.121.1.28", "JPEG", false)
+    MatchingRuleDescription =
     add("1.3.6.1.4.1.1466.115.121.1.30", "Matching Rule Description", true,
     %r! \A \s* \( \s*
 	    #{NUMERICOID} \s*
@@ -162,6 +167,7 @@ class Server
 	(   OBSOLETE \s* )?
 	    SYNTAX \s* #{NUMERICOID} \s*
     \s* \) \s* \z !xu)
+    MatchingRuleUseDescription =
     add("1.3.6.1.4.1.1466.115.121.1.31", "Matching Rule Use Description", true,
     %r! \A \s* \( \s*
 	    #{NUMERICOID} \s*
@@ -188,13 +194,14 @@ class Server
     \s* \) \s* \z !xu)
     add("1.3.6.1.4.1.1466.115.121.1.38", "OID", true, /\A#{WOID}\z/)
     add("1.3.6.1.4.1.1466.115.121.1.39", "Other Mailbox", true)
-    o = add("1.3.6.1.4.1.1466.115.121.1.41", "Postal Address", true)
-    def o.value_from_s(v)
-      v.split(/\$/)
-    end
-    def o.value_to_s(v)
-      return v.join("$") if v.is_a?(Array)
-      return v
+    add("1.3.6.1.4.1.1466.115.121.1.41", "Postal Address", true) do
+      def self.value_from_s(v)
+        v.split(/\$/)
+      end
+      def self.value_to_s(v)
+        return v.join("$") if v.is_a?(Array)
+        return v
+      end
     end
     add("1.3.6.1.4.1.1466.115.121.1.43", "Presentation Address", true)
     add("1.3.6.1.4.1.1466.115.121.1.44", "Printable String", true)
@@ -213,7 +220,8 @@ class Server
     # A few others from RFC2252 section 4.3.2
     add("1.3.6.1.4.1.1466.115.121.1.4", "Audio", false)
     add("1.3.6.1.4.1.1466.115.121.1.40", "Octet String", true)
-  end    
+    add("1.3.6.1.4.1.1466.115.121.1.58", "Substring Assertion", true)
+  end
     
 end # class Server
 end # module LDAP

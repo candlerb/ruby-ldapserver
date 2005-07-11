@@ -12,12 +12,12 @@ class Server
   #   [:and, ..., ..., ...]
   #   [:or, ..., ..., ...]
   #   [:not, ...]
-  #   [:eq, attr, val]
-  #   [:substrings, attr, [:initial, val], [:any, val], [:final, val]]
-  #   [:ge, attr, val]
-  #   [:le, attr, val]
   #   [:present, attr]
-  #   [:approx, attr, val]
+  #   [:eq, attr, MO, val]
+  #   [:approx, attr, MO, val]
+  #   [:substrings, attr, MO, initial=nil, {any, any...}, final=nil]
+  #   [:ge, attr, MO, val]
+  #   [:le, attr, MO, val]
   #
   # This is done rather than a more object-oriented approach, in the
   # hope that it will make it easier to match certain filter structures
@@ -26,12 +26,12 @@ class Server
   #
   # See RFC 2251 4.5.1 for the three-state(!) boolean logic from LDAP
   #
-  # If a schema is provided: attribute names are looked up in it to
-  # find suitable matching rules. These are pushed in front of the array,
-  # e.g.  [:eq, attr, val] becomes [MatchingRule, :eq, attr, val]; also the
-  # attribute name will also be normalised to its first form as listed
-  # in the schema, e.g. 'commonname' becomes 'cn', 'objectclass' becomes
-  # 'objectClass' etc.
+  # If no schema is provided: 'attr' is the raw attribute name as provided
+  # by the client. If a schema is provided: attr is converted to its
+  # normalized name as listed in the schema, e.g. 'commonname' becomes 'cn',
+  # 'objectclass' becomes 'objectClass' etc.
+  # MO is a matching object which can be used to perform the match - either
+  # found via the schema, or a default object if there's no schema.
 
   class Filter
 
@@ -68,83 +68,100 @@ class Server
 	return [:not, cond]
 
       when 3 # equalityMatch
-        attr = asn1.value[0].value.downcase
+        attr = asn1.value[0].value
         val = asn1.value[1].value
-        return [:true] if attr == "objectclass" and val == "top"
+        return [:true] if attr =~ /^objectclass$/i and val == "top"
         if schema
-          a = schema.find_attr(attr)
+          a = schema.find_attrtype(attr)
           return [:undef] unless a and a.equality
-          return [a.equality, :eq, a.name, val]
+          return [:eq, a.to_s, a.equality, val]
         end
-        return [:eq, attr, val]
+        return [:eq, attr, LDAP::Server::MatchingRule::DefaultMatch, val]
 
       when 4 # substrings
-        attr = asn1.value[0].value.downcase
-        res = [:substrings, attr]
+        attr = asn1.value[0].value
         if schema
-          a = schema.find_attr(attr)
+          a = schema.find_attrtype(attr)
           return [:undef] unless a and a.substr
-          res = [a.substr, :substrings, a.name]
+          res = [:substrings, a.to_s, a.substr, nil]
+        else
+          res = [:substrings, attr, LDAP::Server::MatchingRule::DefaultMatch, nil]
         end
+        final_val = nil
+
         asn1.value[1].value.each do |ss|
           case ss.tag
           when 0
-            res << [:initial, ss.value]
+            res[3] = ss.value
           when 1
-            res << [:any, ss.value]
+            res << ss.value
           when 2
-            res << [:final, ss.value]
+            final_val = ss.value
+          else
+            raise LDAP::ResultError::ProtocolError,
+              "Unrecognised substring tag #{ss.tag.inspect}"
           end
         end
+        res << final_val
         return res
 
       when 5 # greaterOrEqual
-        attr = asn1.value[0].value.downcase
+        attr = asn1.value[0].value
         val = asn1.value[1].value
         if schema
-          a = schema.find_attr(attr)
+          a = schema.find_attrtype(attr)
           return [:undef] unless a and a.ordering
-          return [a.ordering, :ge, a.name, val]
+          return [:ge, a.to_s, a.ordering, val]
         end
-        return [:ge, attr, val]
+        return [:ge, attr, LDAP::Server::MatchingRule::DefaultMatch, val]
 
       when 6 # lessOrEqual
-        attr = asn1.value[0].value.downcase
+        attr = asn1.value[0].value
         val = asn1.value[1].value
         if schema
-          a = schema.find_attr(attr)
+          a = schema.find_attrtype(attr)
           return [:undef] unless a and a.ordering
-          return [a.ordering, :le, a.name, val]
+          return [:le, a.to_s, a.ordering, val]
         end
-        return [:le, attr, val]
+        return [:le, attr, LDAP::Server::MatchingRule::DefaultMatch, val]
 
       when 7 # present
-        attr = asn1.value.downcase
-        return [:true] if attr == "objectclass"
+        attr = asn1.value
+        return [:true] if attr =~ /^objectclass$/i
         if schema
-          a = schema.find_attr(attr)
-          attr = a.name if a
+          begin
+            a = schema.find_attrtype(attr)
+            return [:present, a.to_s]
+          rescue LDAP::ResultError::UndefinedAttributeType
+            return [:false]
+          end
         end
         return [:present, attr]
 
       when 8 # approxMatch
-        attr = asn1.value[0].value.downcase
+        attr = asn1.value[0].value
         val = asn1.value[1].value
         if schema
-          a = schema.find_attr(attr)
+          a = schema.find_attrtype(attr)
           # I don't know how properly to deal with approxMatch. I'm assuming
           # that the object will have an equality MatchingRule, and we
           # can defer to that.
-          return [a.equality, :approx, a.name, val] if a and a.equality
+          return [:undef] unless a and a.equality
+          return [:approx, a.to_s, a.equality, val]
         end
-        return [:approx, attr, val]
+        return [:approx, attr, LDAP::Server::MatchingRule::DefaultMatch, val]
 
       #when 9 # extensibleMatch
       #  FIXME
 
       else
-        raise ProtocolError, "Unrecognised Filter tag #{asn1.tag}"
+        raise LDAP::ResultError::ProtocolError,
+          "Unrecognised Filter tag #{asn1.tag}"
       end
+
+    # Unknown attribute type
+    rescue LDAP::ResultError::UndefinedAttributeType
+      return [:undef]
     end
 
     # Run a parsed filter against an attr=>[val] hash.
@@ -152,14 +169,7 @@ class Server
     # Returns true, false or nil.
 
     def self.run(filter, av)
-
-      # Quack! e.g. [duck, :eq, 'bar', '123'] sends duck.eq([vals], '123')
-      # where [vals] are the values for attribute 'bar' in this entry
-      if not filter[0].is_a?(Symbol) and filter[0].respond_to?(filter[1])
-        return filter[0].send(filter[1], av[filter[2]], *filter[3..-1])
-      end
-
-      case filter.first
+      case filter[0]
       when :and
         res = true
         filter[1..-1].each do |elem|
@@ -188,16 +198,9 @@ class Server
       when :present
         return av.has_key?(filter[1])
 
-      # Fallbacks for when there is no schema
-
-      when :eq, :substrings, :ge, :le
-        return LDAP::Server::MatchingRule::DefaultMatch.send(filter[0], av[filter[1]], *filter[2..-1])
-
-      #when :approx
-      #  I'm not sure how to deal with approx. No semantics are defined
-      #  in RFC2251 (perhaps they are in X500?) So I've assumed that anyone
-      #  who wants it will add a method to the equality MatchingRule for
-      #  their attribute.
+      when :eq, :approx, :le, :ge, :substrings
+        # the filter now includes a suitable matching object
+        return filter[2].send(filter.first, av[filter[1].to_s], *filter[3..-1])
 
       when :true
         return true
@@ -209,22 +212,9 @@ class Server
         return nil
       end
 
-      raise OperationsError, "Unimplemented filter #{filter.first.inspect}"
+      raise LDAP::ResultError::OperationsError,
+        "Unimplemented filter #{filter.first.inspect}"
     end
-
-    module EqualityMatch
-      def normalize(x)
-        x
-      end
-
-      def eq(vals,m)
-        m = normalize(m)
-        vals.each { |v| return true if m == normalize(v) }
-        return false
-      end
-    end
-
-
 
   end # class Filter
 end # class Server

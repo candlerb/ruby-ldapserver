@@ -1,3 +1,10 @@
+Added a whole loada Schema stuff.
+Moved exceptions under LDAP::ResultError for consistency with ruby-ldap.
+Changed the parsed [filter] format to include a MatchingRule object always
+(even if no schema is present)
+
+20050711
+
 Changed LDAPserver to LDAP::Server and rejigged the repository to match.
 In your code you will have to change:
   require 'ldapserver/foo'  ->  require 'ldap/server/foo'

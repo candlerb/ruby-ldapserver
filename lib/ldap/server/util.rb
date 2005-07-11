@@ -47,7 +47,7 @@ class Server
         avs.each do |av|
           # These should all be of form attr=value
           unless av =~ /^([^=]+)=(.*)$/
-            raise ProtocolError, "Bad DN component: #{av}"
+            raise LDAP::ResultError::ProtocolError, "Bad DN component: #{av}"
           end
           attr, val = $1.downcase, $2
           # Now we can decode those bits

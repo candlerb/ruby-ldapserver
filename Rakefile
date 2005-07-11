@@ -1,6 +1,10 @@
 task :default => [:src]
 
-VER="0.2"
+VER="0.3"
+
+task :rdoc do
+  sh "rdoc -x '~$' -m README README lib"
+end
 
 srcball = "ruby-ldapserver-#{VER}.tgz"
 sourcefiles = ["README","COPYING","ChangeLog","examples/README","test/core.schema"] + Dir["**/*.rb"]

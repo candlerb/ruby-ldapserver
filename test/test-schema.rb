@@ -1,5 +1,6 @@
 $:.unshift '../lib'
 require 'ldap/server/schema'
+require 'ldap/server/match'
 require 'test/unit'
 
 class SchemaTest < Test::Unit::TestCase
@@ -16,7 +17,7 @@ ATTR
     assert_equal("1.2.3", a.equality)
     assert_equal("4.5.678", a.ordering)
     assert_equal("9.1.1", a.substr)
-    assert_equal("4.3.2", a.syntax.to_s)
+    assert_equal("4.3.2", a.syntax)
     assert_equal(58, a.maxlen)
     assert(a.singlevalue)
     assert(a.collective)
@@ -81,12 +82,30 @@ OC
     assert_equal("objectClass", a.name)
     a = s.find_attrtype("COMMONNAME")
     assert_equal(LDAP::Server::Schema::AttributeType, a.class)
+    assert_equal("caseIgnoreMatch", a.equality.to_s)
+    assert_equal(LDAP::Server::MatchingRule, a.equality.class)
+    assert_equal("caseIgnoreSubstringsMatch", a.substr.to_s)
+    assert_equal(LDAP::Server::MatchingRule, a.substr.class)
+    assert_equal("1.3.6.1.4.1.1466.115.121.1.15", a.syntax.to_s)
+    assert_equal(LDAP::Server::Syntax, a.syntax.class)
     assert_equal("cn", a.name)
     a = s.find_attrtype("COUNTRYname")
     assert_equal("c", a.name)
     # I modified core.schema so that countryName has the appropriate syntax
     assert(a.syntax.match("GB"))
     assert(!a.syntax.match("ABC"))
+  end
+
+  def test_backwards_api
+    s = LDAP::Server::Schema.new
+    s.load_system
+    assert_equal(['subschema','OpenLDAProotDSE','referral','alias','extensibleObject','top'].sort,
+      s.names('objectClasses').sort)
+    assert_equal(['dITStructureRules','nameForms','ditContentRules','objectClasses','attributeTypes','matchingRules','matchingRuleUse'],
+      s.attr('subschema', 'may'))
+    assert_equal([], s.attr('subschema', 'must'))
+    assert_equal(nil, s.attr('foo', 'must'))
+    assert_equal(['top'], s.sup('extensibleObject'))
   end
 
   def test_validate

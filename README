@@ -157,10 +157,11 @@ To-do list
 References
 ----------
 
-ftp://ftp.isi.edu/in-notes/rfc2251.txt
-ftp://ftp.isi.edu/in-notes/rfc2253.txt
-http://www.itu.int/ITU-T/studygroups/com17/languages/X.680-0207.pdf
-http://www.itu.int/ITU-T/studygroups/com10/languages/X.690_1297.pdf
+- ftp://ftp.isi.edu/in-notes/rfc2251.txt (base protocol)
+- ftp://ftp.isi.edu/in-notes/rfc2252.txt (schema)
+- ftp://ftp.isi.edu/in-notes/rfc2253.txt (DN encoding)
+- http://www.itu.int/ITU-T/studygroups/com17/languages/X.680-0207.pdf
+- http://www.itu.int/ITU-T/studygroups/com10/languages/X.690_1297.pdf
 
 Contact
 -------

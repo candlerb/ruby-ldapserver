@@ -15,12 +15,13 @@ $ ldapadd -H ldap://127.0.0.1:1389/
 dn: dc=example,dc=com
 cn: Top object
 
-dn: uid=1,dc=example,dc=com
+dn: cn=Fred Flintstone,dc=example,dc=com
 cn: Fred Flintstone
+sn: Flintstone
 mail: fred@bedrock.org
 mail: fred.flintstone@bedrock.org
 
-dn: uid=2,dc=example,dc=com
+dn: cn=Wilma Flintstone,dc=example,dc=com
 cn: Wilma Flintstone
 mail: wilma@bedrock.org
 ^D
@@ -64,10 +65,21 @@ You will need to set up a MySQL database with a table conforming to the
 schema given within the code. Once done, LDAP gives a read-only view of the
 database with only the filter "(uid=<foo>)" supported.
 
-Example 3: preforking server
-----------------------------
+Example 3: preforking server and schema
+---------------------------------------
 
 This functions in the same way as rbslapd1.rb. However, since each query is
 answered in a separate process, the YAML file on disk is used as the master
 repository. Update operations re-write this file each time.
+
+Also, the schema is read from file 'core.schema'. Attempting to insert the
+above entries will fail, due to schema violations. Insert a valid entry,
+e.g.
+
+dn: cn=Fred Flintstone,dc=example,dc=com
+objectClass: organizationalPerson
+cn: Fred Flintstone
+sn: Flintstone
+telephoneNumber: +1 555 1234
+telephoneNumber: +1 555 5432
 

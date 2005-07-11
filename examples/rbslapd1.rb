@@ -23,7 +23,7 @@ class HashOperation < LDAP::Server::Operation
     when LDAP::Server::BaseObject
       # client asked for single object by DN
       obj = @hash[basedn]
-      raise LDAP::Server::NoSuchObject unless obj
+      raise LDAP::ResultError::NoSuchObject unless obj
       send_SearchResultEntry(basedn, obj) if LDAP::Server::Filter.run(filter, obj)
 
     when LDAP::Server::WholeSubtree
@@ -34,26 +34,26 @@ class HashOperation < LDAP::Server::Operation
       end
 
     else
-      raise LDAP::Server::UnwillingToPerform, "OneLevel not implemented"
+      raise LDAP::ResultError::UnwillingToPerform, "OneLevel not implemented"
 
     end
   end
 
   def add(dn, av)
     dn.downcase!
-    raise LDAP::Server::EntryAlreadyExists if @hash[dn]
+    raise LDAP::ResultError::EntryAlreadyExists if @hash[dn]
     @hash[dn] = av
   end
 
   def del(dn)
     dn.downcase!
-    raise LDAP::Server::NoSuchObject unless @hash.has_key?(dn)
+    raise LDAP::ResultError::NoSuchObject unless @hash.has_key?(dn)
     @hash.delete(dn)
   end
 
   def modify(dn, ops)
     entry = @hash[dn]
-    raise LDAP::Server::NoSuchObject unless entry
+    raise LDAP::ResultError::NoSuchObject unless entry
     ops.each do |op, attr, vals|
       case op 
       when :add

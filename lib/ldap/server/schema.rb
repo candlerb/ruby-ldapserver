@@ -4,8 +4,6 @@ require 'ldap/server/result'
 module LDAP
 class Server
 
-  # TODO: Add a backwards-compatible API to LDAP::Schema
-
   # This object represents an LDAP schema: that is, a collection of
   # objectclasses and attributetypes. Methods are provided for loading
   # the schema (from a string or a disk file), and validating an av-hash
@@ -65,7 +63,7 @@ class Server
     def find_attrtype(n)
       return n if n.nil? or n.is_a?(LDAP::Server::Schema::AttributeType)
       r = @attrtypes[n.downcase]
-      raise LDAP::Server::UndefinedAttributeType, "Unknown AttributeType #{n.inspect}" unless r
+      raise LDAP::ResultError::UndefinedAttributeType, "Unknown AttributeType #{n.inspect}" unless r
       r
     end
 
@@ -90,7 +88,7 @@ class Server
     def find_objectclass(n)
       return n if n.nil? or n.is_a?(LDAP::Server::Schema::ObjectClass)
       r = @objectclasses[n.downcase]
-      raise LDAP::Server::ObjectClassViolation, "Unknown ObjectClass #{n.inspect}" unless r
+      raise LDAP::ResultError::ObjectClassViolation, "Unknown ObjectClass #{n.inspect}" unless r
       r
     end
 
@@ -145,7 +143,7 @@ class Server
 
     def junk_line(data)
       return if data.empty?
-      raise LDAP::Server::InvalidAttributeSyntax,
+      raise LDAP::ResultError::InvalidAttributeSyntax,
         "Expected 'attributetype' or 'objectclass', got #{data}"
     end
     private :junk_line
@@ -212,7 +210,6 @@ EOS
     def resolve_oids
 
       all_attrtypes.each do |a|
-        a.instance_eval { @syntax = LDAP::Server::Syntax.find(@syntax) }
         if a.sup
           s = find_attrtype(a.sup)
           a.instance_eval {
@@ -229,7 +226,12 @@ EOS
             @usage ||= s.usage
           }
         end
-        # TODO: equality, ordering, substr
+        a.instance_eval do
+          @syntax = LDAP::Server::Syntax.find(@syntax) if @syntax
+          @equality = LDAP::Server::MatchingRule.find(@equality) if @equality
+          @ordering = LDAP::Server::MatchingRule.find(@ordering) if @ordering
+          @substr = LDAP::Server::MatchingRule.find(@substr) if @substr
+        end
       end
 
       all_objectclasses.each do |o|
@@ -257,6 +259,10 @@ EOS
     # converted into their nearest-equivalent Ruby classes. The
     # objectClass attribute always has any missing superclasses added;
     # if 'normalize' then you get an array of ObjectClass objects.
+    #
+    # No DN checks are done here, since we don't know the DN.
+    # Checking that the entry contains an attribute for the RDN is the
+    # responsibility of the caller.
 
     def validate(av, normalize=false)
       oc = nil
@@ -267,13 +273,13 @@ EOS
       # for the various types of validation errors
 
       av.each do |attr,vals|
-        attr = find_attr(attr)  # convert to AttributeType object
+        attr = find_attrtype(attr)  # convert to AttributeType object
         got_attr[attr] = true
 
         vals = [vals] unless vals.is_a?(Array)
-        raise LDAP::Server::ObjectClassViolation,
+        raise LDAP::ResultError::ObjectClassViolation,
           "Attribute #{attr} is SINGLE-VALUE" if attr.singlevalue and vals.size != 1
-        raise LDAP::Server::InvalidAttributeSyntax,
+        raise LDAP::ResultError::InvalidAttributeSyntax,
           "Empty value list for attribute #{attr}" if vals.empty?
 
         if attr.name == 'objectClass'
@@ -283,13 +289,13 @@ EOS
         else
           v2 = []
           vals.each do |val|
-            raise LDAP::Server::InvalidAttributeSyntax,
+            raise LDAP::ResultError::InvalidAttributeSyntax,
               "Nil or empty value for attribute #{attr}" if val.nil? or val.empty?
-            raise LDAP::Server::ConstraintViolation,
+            raise LDAP::ResultError::ConstraintViolation,
               "Cannot modify #{attr}" if attr.nousermod
-            raise LDAP::Server::InvalidAttributeSyntax,
+            raise LDAP::ResultError::InvalidAttributeSyntax,
               "Bad value for #{attr}: #{val.inspect}" if attr.syntax and ! attr.syntax.match(val)
-            raise LDAP::Server::InvalidAttributeSyntax,
+            raise LDAP::ResultError::InvalidAttributeSyntax,
               "Value too long for #{attr} (max #{attr.maxlen})" if attr.maxlen and val.length > attr.maxlen
             v2 << attr.value_from_s(val) if normalize
           end
@@ -299,7 +305,7 @@ EOS
 
       # Now do objectClass checks.
       unless oc
-        raise LDAP::Server::ObjectClassViolation,
+        raise LDAP::ResultError::ObjectClassViolation,
           "objectClass attribute missing"
       end
 
@@ -314,7 +320,7 @@ EOS
 
       # Check that at least one structural objectClass is present
       unless oc.find { |s| s.struct == :structural }
-        raise LDAP::Server::ObjectClassViolation,
+        raise LDAP::ResultError::ObjectClassViolation,
           "Entry must have at least one structural objectClass"
       end
 
@@ -323,6 +329,7 @@ EOS
       oc.each do |objectclass|
         objectclass.must.each do |m|
           unless got_attr[m]
+            raise LDAP::ResultError::ObjectClassViolation, "Missing attribute #{m} required by objectClass #{objectclass}"
           end
           allow_attr[m] = true
         end
@@ -331,14 +338,72 @@ EOS
         end
       end
 
-      # Now check all the attributes given are permitted by MUST or MAY
-      got_attr.each do |attr,dummy|
-        unless allow_attr[attr]
-          raise LDAP::Server::ObjectClassViolation, "Attribute #{attr} not permitted by objectClass"
+      unless oc.find { |objectclass| objectclass.name == 'extensibleObject' }
+        # Now check all the attributes given are permitted by MUST or MAY
+        got_attr.each do |attr,dummy|
+          unless allow_attr[attr]
+            raise LDAP::ResultError::ObjectClassViolation, "Attribute #{attr} not permitted by objectClass"
+          end
         end
       end
 
       res
+    end
+
+    # Hopefully backwards-compatible API for ruby-ldap's LDAP::Schema.
+    # Since MUST/MAY/SUP may point to schema objects, convert them back
+    # to strings.
+
+    def names(key)
+      case key
+      when 'objectClasses'
+        return all_objectclasses.collect { |e| e.name }
+      when 'attributeTypes'
+        return all_attrtypes.collect { |e| e.name }
+      when 'ldapSyntaxes'
+        return LDAP::ResultError::Syntax.all_syntaxes.collect { |e| e.name }
+      # TODO: matchingRules, matchingRuleUse
+      end
+      return nil
+    end
+
+    # Backwards-compatible for ruby-ldap LDAP::Schema
+
+    def attr(oc,at)
+      o = find_objectclass(oc)
+      case at.upcase
+      when 'MUST'
+        return o.must.collect { |e| e.to_s }
+      when 'MAY'
+        return o.may.collect { |e| e.to_s }
+      when 'SUP'
+        return o.sup.collect { |e| e.to_s }
+      when 'NAME'
+        return o.names.collect { |e| e.to_s }
+      when 'DESC'
+        return [o.desc]
+      end
+      return nil
+    rescue LDAP::ResultError
+      return nil
+    end
+
+    # Backwards-compatible for ruby-ldap LDAP::Schema
+
+    def must(oc)
+      attr(oc, "MUST")
+    end
+
+    # Backwards-compatible for ruby-ldap LDAP::Schema
+
+    def may(oc)
+      attr(oc, "MAY")
+    end
+
+    # Backwards-compatible for ruby-ldap LDAP::Schema
+
+    def sup(oc)
+      attr(oc, "SUP")
     end
 
     #####################################################################
@@ -353,7 +418,8 @@ EOS
 
       def initialize(str)
         m = LDAP::Server::Syntax::AttributeTypeDescription.match(str)
-        raise "Bad AttributeTypeDescription #{str.inspect}" unless m
+        raise LDAP::ResultError::InvalidAttributeSyntax,
+          "Bad AttributeTypeDescription #{str.inspect}" unless m
         @oid = m[1]
         @names = (m[2]||"").scan(/'(.*?)'/).flatten
 	@desc = m[3]
@@ -425,7 +491,8 @@ EOS
 
       def initialize(str)
         m = LDAP::Server::Syntax::ObjectClassDescription.match(str)
-        raise "Bad ObjectClassDescription #{str.inspect}" unless m
+        raise LDAP::ResultError::InvalidAttributeSyntax,
+          "Bad ObjectClassDescription #{str.inspect}" unless m
         @oid = m[1]
         @names = (m[2]||"").scan(/'(.*?)'/).flatten
 	@desc = m[3]

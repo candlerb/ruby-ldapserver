@@ -100,11 +100,12 @@ class SQLOperation < LDAP::Server::Operation
   end
 
   # Handle searches of the form "(uid=<foo>)" using SQL backend
+  # (uid=foo) => [:eq, "uid", matchobj, "foo"]
 
   def search(basedn, scope, deref, filter)
-    raise LDAP::Server::UnwillingToPerform, "Bad base DN" unless basedn == BASEDN
-    raise LDAP::Server::UnwillingToPerform, "Bad filter" unless filter[0..1] == [:eq, "uid"]
-    uid = filter[2]
+    raise LDAP::ResultError::UnwillingToPerform, "Bad base DN" unless basedn == BASEDN
+    raise LDAP::ResultError::UnwillingToPerform, "Bad filter" unless filter[0..1] == [:eq, "uid"]
+    uid = filter[3]
     @@pool.borrow do |sql|
       q = "select login_id,passwd from #{TABLE} where login='#{sql.quote(uid)}'"
       puts "SQL Query #{sql.object_id}: #{q}" if $debug
@@ -123,7 +124,7 @@ class SQLOperation < LDAP::Server::Operation
   def simple_bind(version, dn, password)
     return if dn.nil?   # accept anonymous
 
-    raise LDAP::Server::UnwillingToPerform unless dn =~ /\Aid=(\d+),#{BASEDN}\z/
+    raise LDAP::ResultError::UnwillingToPerform unless dn =~ /\Aid=(\d+),#{BASEDN}\z/
     login_id = $1
     dbpw = @@cache.find(login_id)
     unless dbpw
@@ -137,7 +138,7 @@ class SQLOperation < LDAP::Server::Operation
         end
       end
     end
-    raise LDAP::Server::InvalidCredentials unless dbpw and dbpw != "" and dbpw == password
+    raise LDAP::ResultError::InvalidCredentials unless dbpw and dbpw != "" and dbpw == password
   end
 end
 

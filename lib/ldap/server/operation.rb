@@ -78,24 +78,37 @@ class Server
     end
 
     # Send a found entry. Avs are {attr1=>val1, attr2=>[val2,val3]}
-    # TODO: If schema given, return operational attributes only if
+    # If schema given, return operational attributes only if
     # explicitly requested
 
     def send_SearchResultEntry(dn, avs, opt={})
       @rescount += 1
       if @sizelimit
-        raise SizeLimitExceeded if @rescount > @sizelimit
+        raise LDAP::ResultError::SizeLimitExceeded if @rescount > @sizelimit
       end
 
+      if @schema
+        # normalize the attribute names
+        @attributes = @attributes.collect { |a| @schema.find_attrtype(a).to_s }
+      end
+
+      sendall = @attributes == [] || @attributes.include?("*")
       avseq = []
 
-      (@attributes || avs.keys).each do |attr|
+      avs.each do |attr, vals|
+        if !@attributes.include?(attr)
+          next unless sendall
+          if @schema
+            a = @schema.find_attrtype(attr)
+            next unless a and (a.usage.nil? or a.usage == :userApplications)
+          end
+        end
+
         if @typesOnly
-          vals = []
+          vals = [] 
         else
-          vals = avs[attr]
-          next if vals.nil?
           vals = [vals] unless vals.kind_of?(Array)
+          # FIXME: optionally do a value_to_s conversion here?
         end
 
         avseq << OpenSSL::ASN1::Sequence([
@@ -171,14 +184,14 @@ class Server
         credentials = authentication.value[1].value
         # sasl_bind(version, dn, mechanism, credentials)
         # FIXME: needs to exchange further BindRequests
-        raise AuthMethodNotSupported
+        raise LDAP::ResultError::AuthMethodNotSupported
       else
-        raise ProtocolError, "BindRequest bad AuthenticationChoice"
+        raise LDAP::ResultError::ProtocolError, "BindRequest bad AuthenticationChoice"
       end
       send_BindResponse(0)
       return dn, version
 
-    rescue ResultCode => e
+    rescue LDAP::ResultError => e
       send_BindResponse(e.to_i, :errorMessage=>e.message)
       return nil, version
     end
@@ -196,7 +209,7 @@ class Server
         v = seq.value[1].value.collect { |asn1| asn1.value  }
         # Not clear from the spec whether the same attribute (with
         # distinct values) can appear more than once in AttributeList
-        raise AttributeOrValueExists, a if av[a]
+        raise LDAP::ResultError::AttributeOrValueExists, a if av[a]
         av[a] = v
       end
       return av
@@ -209,9 +222,8 @@ class Server
       client_sizelimit = protocolOp.value[3].value
       client_timelimit = protocolOp.value[4].value
       @typesOnly = protocolOp.value[5].value
-      filter = Filter::parse(protocolOp.value[6])
+      filter = Filter::parse(protocolOp.value[6], @schema)
       @attributes = protocolOp.value[7].value.collect {|x| x.value}
-      @attributes = nil if @attributes == []
 
       @rescount = 0
       @sizelimit = server_sizelimit
@@ -231,13 +243,13 @@ class Server
       t = server_timelimit || 10
       t = client_timelimit if client_timelimit > 0 and client_timelimit < t
 
-      Timeout::timeout(t, TimeLimitExceeded) do
+      Timeout::timeout(t, LDAP::ResultError::TimeLimitExceeded) do
         search(baseObject, scope, deref, filter)
       end
       send_SearchResultDone(0)
 
-    # Note that TimeLimitExceeded is a subclass of ResultCode
-    rescue ResultCode => e
+    # Note that TimeLimitExceeded is a subclass of LDAP::ResultError
+    rescue LDAP::ResultError => e
       send_SearchResultDone(e.to_i, :errorMessage=>e.message)
 
     rescue Abandon
@@ -250,7 +262,7 @@ class Server
 
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
-      send_SearchResultDone(OperationsError.new.to_i, :errorMessage=>e.message)
+      send_SearchResultDone(LDAP::ResultError::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
     def do_modify(protocolOp, controls)
@@ -265,7 +277,7 @@ class Server
         when 2
           op = :replace
         else
-          raise ProtocolError, "Bad modify operation #{seq[0].value}"
+          raise LDAP::ResultError::ProtocolError, "Bad modify operation #{seq[0].value}"
         end
         attr = seq.value[1].value[0].value
         vals = seq.value[1].value[1].value.collect { |v| v.value }
@@ -275,13 +287,13 @@ class Server
       modify(dn, modinfo)
       send_ModifyResponse(0)
 
-    rescue ResultCode => e
+    rescue LDAP::ResultError => e
       send_ModifyResponse(e.to_i, :errorMessage=>e.message)
     rescue Abandon
       # no response
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
-      send_ModifyResponse(OperationsError.new.to_i, :errorMessage=>e.message)
+      send_ModifyResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
     def do_add(protocolOp, controls)
@@ -290,13 +302,13 @@ class Server
       add(dn, av)
       send_AddResponse(0)
 
-    rescue ResultCode => e
+    rescue LDAP::ResultError => e
       send_AddResponse(e.to_i, :errorMessage=>e.message)
     rescue Abandon
       # no response
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
-      send_AddResponse(OperationsError.new.to_i, :errorMessage=>e.message)
+      send_AddResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
     def do_del(protocolOp, controls)
@@ -304,13 +316,13 @@ class Server
       del(dn)
       send_DelResponse(0)
 
-    rescue ResultCode => e
+    rescue LDAP::ResultError => e
       send_DelResponse(e.to_i, :errorMessage=>e.message)
     rescue Abandon
       # no response
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
-      send_DelResponse(OperationsError.new.to_i, :errorMessage=>e.message)
+      send_DelResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
     def do_modifydn(protocolOp, controls)
@@ -323,13 +335,13 @@ class Server
       modifydn(entry, newrdn, deleteoldrdn, newSuperior)
       send_ModifyDNResponse(0)
 
-    rescue ResultCode => e
+    rescue LDAP::ResultError => e
       send_ModifyDNResponse(e.to_i, :errorMessage=>e.message)
     rescue Abandon
       # no response
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
-      send_ModifyDNResponse(OperationsError.new.to_i, :errorMessage=>e.message)
+      send_ModifyDNResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
     def do_compare(protocolOp, controls)
@@ -341,13 +353,13 @@ class Server
         send_CompareResponse(5)  # compareFalse
       end
 
-    rescue ResultCode => e
+    rescue LDAP::ResultError => e
       send_CompareResponse(e.to_i, :errorMessage=>e.message)
     rescue Abandon
       # no response
     rescue Exception => e
       @connection.log "#{e}: #{e.backtrace[0]}"
-      send_CompareResponse(OperationsError.new.to_i, :errorMessage=>e.message)
+      send_CompareResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
     ############################################################
@@ -379,10 +391,10 @@ class Server
 
     def simple_bind(version, dn, password)
       if version != 3
-        raise ProtocolError, "version 3 only"
+        raise LDAP::ResultError::ProtocolError, "version 3 only"
       end
       if dn
-        raise InappropriateAuthentication, "This server only supports anonymous bind"
+        raise LDAP::ResultError::InappropriateAuthentication, "This server only supports anonymous bind"
       end
     end
 
@@ -394,7 +406,7 @@ class Server
     # using @connection.binddn
 
     def search(basedn, scope, deref, filter, attrs)
-      raise UnwillingToPerform, "search not implemented"
+      raise LDAP::ResultError::UnwillingToPerform, "search not implemented"
     end
 
     # Handle a modify request; override this
@@ -403,7 +415,7 @@ class Server
     #  [[:add, attr, [vals]], [:delete, attr, [vals]], [:replace, attr, [vals]]
 
     def modify(dn, modification)
-      raise UnwillingToPerform, "modify not implemented"
+      raise LDAP::ResultError::UnwillingToPerform, "modify not implemented"
     end
 
     # Handle an add request; override this
@@ -413,26 +425,26 @@ class Server
     # that the connection has sufficient authorisation using @connection.binddn
 
     def add(dn, av)
-      raise UnwillingToPerform, "add not implemented"
+      raise LDAP::ResultError::UnwillingToPerform, "add not implemented"
     end
 
     # Handle a del request; override this
 
     def del(dn)
-      raise UnwillingToPerform, "delete not implemented"
+      raise LDAP::ResultError::UnwillingToPerform, "delete not implemented"
     end
 
     # Handle a modifydn request; override this
 
     def modifydn(entry, newrdn, deleteoldrdn, newSuperior)
-      raise UnwillingToPerform, "modifydn not implemented"
+      raise LDAP::ResultError::UnwillingToPerform, "modifydn not implemented"
     end
 
     # Handle a compare request; override this. Return true or false,
     # or raise an exception for errors.
 
     def compare(entry, attr, val)
-      raise UnwillingToPerform, "compare not implemented"
+      raise LDAP::ResultError::UnwillingToPerform, "compare not implemented"
     end
 
   end # class Operation

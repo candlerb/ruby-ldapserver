@@ -86,7 +86,7 @@ class DirOperation < LDAP::Server::Operation
       # client asked for single object by DN
       @dir.update
       obj = @dir.data[basedn]
-      raise LDAP::Server::NoSuchObject unless obj
+      raise LDAP::ResultError::NoSuchObject unless obj
       ok = LDAP::Server::Filter.run(filter, obj)
       $debug << "Match=#{ok.inspect}: #{obj.inspect}\n" if $debug
       send_SearchResultEntry(basedn, obj) if ok
@@ -102,16 +102,20 @@ class DirOperation < LDAP::Server::Operation
       end
 
     else
-      raise LDAP::Server::UnwillingToPerform, "OneLevel not implemented"
+      raise LDAP::ResultError::UnwillingToPerform, "OneLevel not implemented"
 
     end
   end
 
   def add(dn, av)
+    av = @schema.validate(av)
+    # FIXME: validate that a superior object exists
+    # FIXME: validate that av contains the RDN attribute (yuk)
+    # FIXME: handle operational attributes like modifyTimestamp
     dn.downcase!
     @dir.lock do
       @dir.update
-      raise LDAP::Server::EntryAlreadyExists if @dir.data[dn]
+      raise LDAP::ResultError::EntryAlreadyExists if @dir.data[dn]
       @dir.data[dn] = av
       @dir.write
     end
@@ -121,7 +125,7 @@ class DirOperation < LDAP::Server::Operation
     dn.downcase!
     @dir.lock do
       @dir.update
-      raise LDAP::Server::NoSuchObject unless @dir.data.has_key?(dn)
+      raise LDAP::ResultError::NoSuchObject unless @dir.data.has_key?(dn)
       @dir.data.delete(dn)
       @dir.write
     end
@@ -129,10 +133,11 @@ class DirOperation < LDAP::Server::Operation
 
   def modify(dn, ops)
     dn.downcase!
+    # FIXME: validate
     @dir.lock do
       @dir.update
       entry = @dir.data[dn]
-      raise LDAP::Server::NoSuchObject unless entry
+      raise LDAP::ResultError::NoSuchObject unless entry
       ops.each do |op, attr, vals|
         case op 
         when :add

@@ -32,9 +32,9 @@ class Server
       @logger << "[#{@io.peeraddr[3]}]: #{msg}\n"
     end
 
-    def startssl
+    def startssl # :yields:
       @mutex.synchronize do
-        raise LDAP::Server::OperationsError if @ssl or @active_reqs.size > 0
+        raise LDAP::ResultError::OperationsError if @ssl or @active_reqs.size > 0
         yield if block_given?
         @io = OpenSSL::SSL::SSLSocket.new(@io, @opt[:ssl_ctx])
         @io.sync_close = true
@@ -66,7 +66,7 @@ class Server
 
       if (len & 0x80) != 0	# long form
         len = len & 0x7f
-        raise ProtocolError, "Indefinite length encoding not supported" if len == 0
+        raise LDAP::ResultError::ProtocolError, "Indefinite length encoding not supported" if len == 0
         offset = blk.length
         blk << io.read(len)
         # is there a more efficient way of doing this?
@@ -92,13 +92,13 @@ class Server
             # Debugging:
             # puts "Request: #{blk.unpack("H*")}\n#{asn1.inspect}" if $debug
 
-            raise ProtocolError, "LDAPMessage must be SEQUENCE" unless asn1.is_a?(OpenSSL::ASN1::Sequence)
-            raise ProtocolError, "Bad Message ID" unless asn1.value[0].is_a?(OpenSSL::ASN1::Integer)
+            raise LDAP::ResultError::ProtocolError, "LDAPMessage must be SEQUENCE" unless asn1.is_a?(OpenSSL::ASN1::Sequence)
+            raise LDAP::ResultError::ProtocolError, "Bad Message ID" unless asn1.value[0].is_a?(OpenSSL::ASN1::Integer)
             messageId = asn1.value[0].value
 
             protocolOp = asn1.value[1]
-            raise ProtocolError, "Bad protocolOp" unless protocolOp.is_a?(OpenSSL::ASN1::ASN1Data)
-            raise ProtocolError, "Bad protocolOp tag class" unless protocolOp.tag_class == :APPLICATION
+            raise LDAP::ResultError::ProtocolError, "Bad protocolOp" unless protocolOp.is_a?(OpenSSL::ASN1::ASN1Data)
+            raise LDAP::ResultError::ProtocolError, "Bad protocolOp tag class" unless protocolOp.tag_class == :APPLICATION
 
             # controls are not properly implemented
             c = asn1.value[2]
@@ -193,11 +193,11 @@ class Server
               abandon(protocolOp.value)
 
             else
-              raise ProtocolError, "Unrecognised protocolOp tag #{protocolOp.tag}"
+              raise LDAP::ResultError::ProtocolError, "Unrecognised protocolOp tag #{protocolOp.tag}"
             end
 
-          rescue ProtocolError, OpenSSL::ASN1::ASN1Error => e
-            send_notice_of_disconnection(ProtocolError.new.to_i, e.message)
+          rescue LDAP::ResultError::ProtocolError, OpenSSL::ASN1::ASN1Error => e
+            send_notice_of_disconnection(LDAP::ResultError::ProtocolError.new.to_i, e.message)
             throw(:close)
 
           # all other exceptions propagate up and are caught by tcpserver
@@ -224,7 +224,7 @@ class Server
     def abandon(messageID)
       @mutex.synchronize do
         thread = @active_reqs.delete(messageID)
-        thread.raise Abandon if thread and thread.alive?
+        thread.raise LDAP::Abandon if thread and thread.alive?
       end
     end
 
@@ -232,7 +232,7 @@ class Server
       return if @active_reqs.size == 0
       @mutex.synchronize do
         @active_reqs.each do |id, thread|
-          thread.raise Abandon if thread.alive?
+          thread.raise LDAP::Abandon if thread.alive?
         end
         @active_reqs = {}
       end
