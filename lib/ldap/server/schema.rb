@@ -251,84 +251,114 @@ EOS
 
     end
 
-    # Validate an AV-hash {attr=>[vals], attr=>[vals], ...}
-    # where attr are attribute names, and vals are all strings, e.g.
-    # as provided by an LDAP client.
-    # Return a new hash where 'attr' has been replaced by the canonical
-    # name of the attribute. If 'normalize' is true then the values are
-    # converted into their nearest-equivalent Ruby classes. The
-    # objectClass attribute always has any missing superclasses added;
-    # if 'normalize' then you get an array of ObjectClass objects.
+    # Validate a new entry or update. For a new entry, just pass a hash
+    # of attr=>[val, val, ...]; for an update, the first parameter is
+    # a hash of attr=>[:modtype, val, val...] and the second parameter
+    # is the existing entry, where it is assumed that the attribute names
+    # are already in their standard string forms (as returned by attr#name)
+    #
+    # Returns a hash containing the updated entry.
+    #
+    # If a block is given, it is called to decide whether the user is
+    # allowed to update an attribute; parameter is the attr *object*
+    # (not name; use #name if you need its name instead). Return false
+    # if the update is not permitted. Otherwise, the only restriction
+    # will be that updates to attributes declared 'nousermod' are forbidden.
     #
     # No DN checks are done here, since we don't know the DN.
     # Checking that the entry contains an attribute for the RDN is the
     # responsibility of the caller.
 
-    def validate(av, normalize=false)
-      oc = nil
-      res = {}
-      got_attr = {}
+    def validate(mods, entry={})
+
+      # Run through the mods, make the normalized names, and perform any
+      # updates
 
       # FIXME: I don't know if these are the right results to return
       # for the various types of validation errors
 
-      av.each do |attr,vals|
-        attr = find_attrtype(attr)  # convert to AttributeType object
-        got_attr[attr] = true
+      oc_changed = false
+      res = entry.dup
+      mods.each do |attrname, nv|
+        attr = find_attrtype(attrname)
+        attrname = attr.to_s
+        raise LDAP::ResultError::ConstraintViolation,
+          "Cannot modify #{attrname}" if attr.nousermod or
+                                     (block_given? and !yield(attr))
+        # Perform the update
+        vals = res[attrname] || []
+        checkvals = []
+        nv = [nv] unless nv.is_a?(Array)
 
-        vals = [vals] unless vals.is_a?(Array)
+        case nv.first
+        when :add
+          checkvals = nv[1..-1]
+          vals += checkvals
+          vals.uniq!   # FIXME: ?? error if duplicate values
+        when :delete
+          nv = nv[1..-1]
+          if nv.empty?
+            vals = [] # ?? error if does not exist
+          else
+            nv.each { |v| vals.delete(v) } # ?? error if value missing
+          end
+        when :replace
+          vals = checkvals = nv[1..-1]
+        else
+          vals = checkvals = nv
+        end
+        if vals == []
+          res.delete[attrname]
+        else
+          res[attrname] = vals
+        end
+
+        # Attribute validation
         raise LDAP::ResultError::ObjectClassViolation,
           "Attribute #{attr} is SINGLE-VALUE" if attr.singlevalue and vals.size != 1
-        raise LDAP::ResultError::InvalidAttributeSyntax,
-          "Empty value list for attribute #{attr}" if vals.empty?
 
-        if attr.name == 'objectClass'
-          oc = vals.collect do |val|
-            find_objectclass(val)
-          end
-        else
-          v2 = []
-          vals.each do |val|
-            raise LDAP::ResultError::InvalidAttributeSyntax,
-              "Nil or empty value for attribute #{attr}" if val.nil? or val.empty?
-            raise LDAP::ResultError::ConstraintViolation,
-              "Cannot modify #{attr}" if attr.nousermod
-            raise LDAP::ResultError::InvalidAttributeSyntax,
-              "Bad value for #{attr}: #{val.inspect}" if attr.syntax and ! attr.syntax.match(val)
-            raise LDAP::ResultError::InvalidAttributeSyntax,
-              "Value too long for #{attr} (max #{attr.maxlen})" if attr.maxlen and val.length > attr.maxlen
-            v2 << attr.value_from_s(val) if normalize
-          end
-          res[attr.name] = normalize ? v2 : vals
+        checkvals.each do |val|
+          raise LDAP::ResultError::InvalidAttributeSyntax,
+            "Nil or empty value for attribute #{attr}" if val.nil? or val.empty?
+          raise LDAP::ResultError::InvalidAttributeSyntax,
+            "Bad value for #{attr}: #{val.inspect}" if attr.syntax and ! attr.syntax.match(val)
+          raise LDAP::ResultError::InvalidAttributeSyntax,
+            "Value too long for #{attr} (max #{attr.maxlen})" if attr.maxlen and val.length > attr.maxlen
         end
+
+        oc_changed = true if attrname == 'objectClass'
       end
 
-      # Now do objectClass checks.
+      # Now do objectClass checks
+      oc = res['objectClass']
       unless oc
         raise LDAP::ResultError::ObjectClassViolation,
           "objectClass attribute missing"
       end
+      oc = oc.collect { |val| find_objectclass(val) }
 
-      # Add superior objectClasses (note: growing an array while you
-      # iterate over it seems to work in ruby-1.8.2 anyway!)
-      oc.each do |objectclass|
-        objectclass.sup.each do |s|
-          oc.push(s) unless oc.include?(s)
+      if oc_changed
+        # Add superior objectClasses (note: growing an array while you
+        # iterate over it seems to work, in ruby-1.8.2 anyway!)
+        oc.each do |objectclass|
+          objectclass.sup.each do |s|
+            oc.push(s) unless oc.include?(s)
+          end
         end
-      end
-      res['objectClass'] = normalize ? oc : oc.collect { |oo| oo.to_s }
+        res['objectClass'] = oc.collect { |oo| oo.to_s }
 
-      # Check that at least one structural objectClass is present
-      unless oc.find { |s| s.struct == :structural }
-        raise LDAP::ResultError::ObjectClassViolation,
-          "Entry must have at least one structural objectClass"
+        # Check that exactly one structural objectClass is present
+        unless oc.find_all { |s| s.struct == :structural }.size == 1
+          raise LDAP::ResultError::ObjectClassViolation,
+            "Entry must have at exactly one structural objectClass"
+        end
       end
 
       # Ensure that all MUST attributes are present
       allow_attr = {}
       oc.each do |objectclass|
         objectclass.must.each do |m|
-          unless got_attr[m]
+          unless res[m] and res[m] != []
             raise LDAP::ResultError::ObjectClassViolation, "Missing attribute #{m} required by objectClass #{objectclass}"
           end
           allow_attr[m] = true
@@ -340,14 +370,14 @@ EOS
 
       unless oc.find { |objectclass| objectclass.name == 'extensibleObject' }
         # Now check all the attributes given are permitted by MUST or MAY
-        got_attr.each do |attr,dummy|
+        res.each_key do |attr|
           unless allow_attr[attr]
             raise LDAP::ResultError::ObjectClassViolation, "Attribute #{attr} not permitted by objectClass"
           end
         end
       end
 
-      res
+      return res
     end
 
     # Hopefully backwards-compatible API for ruby-ldap's LDAP::Schema.

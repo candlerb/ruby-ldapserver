@@ -206,6 +206,9 @@ class Server
       av = {}
       set.value.each do |seq|
         a = seq.value[0].value
+        if @schema
+          a = @schema.find_attrtype(a).to_s
+        end
         v = seq.value[1].value.collect { |asn1| asn1.value  }
         # Not clear from the spec whether the same attribute (with
         # distinct values) can appear more than once in AttributeList
@@ -267,21 +270,23 @@ class Server
 
     def do_modify(protocolOp, controls)
       dn = protocolOp.value[0].value
-      modinfo = []
+      modinfo = {}
       protocolOp.value[1].value.each do |seq|
+        attr = seq.value[1].value[0].value
+        if @schema
+          attr = @schema.find_attrtype(attr).to_s
+        end
+        vals = seq.value[1].value[1].value.collect { |v| v.value }
         case seq.value[0].value
         when 0
-          op = :add
+          modinfo[attr] = [:add] + vals
         when 1
-          op = :delete
+          modinfo[attr] = [:delete] + vals
         when 2
-          op = :replace
+          modinfo[attr] = [:replace] + vals
         else
-          raise LDAP::ResultError::ProtocolError, "Bad modify operation #{seq[0].value}"
+          raise LDAP::ResultError::ProtocolError, "Bad modify operation #{seq.value[0].value}"
         end
-        attr = seq.value[1].value[0].value
-        vals = seq.value[1].value[1].value.collect { |v| v.value }
-        modinfo << [op, attr, vals]
       end
 
       modify(dn, modinfo)
@@ -347,7 +352,12 @@ class Server
     def do_compare(protocolOp, controls)
       entry = protocolOp.value[0].value
       ava = protocolOp.value[1].value
-      if compare(entry, ava[0].value, ava[1].value)
+      attr = ava[0].value
+      if @schema
+        attr = @schema.find_attrtype(attr).to_s
+      end
+      val = ava[1].value
+      if compare(entry, attr, val)
         send_CompareResponse(6)  # compareTrue
       else
         send_CompareResponse(5)  # compareFalse
@@ -411,8 +421,10 @@ class Server
 
     # Handle a modify request; override this
     #
-    # dn is the object to modify; modification is an array of
-    #  [[:add, attr, [vals]], [:delete, attr, [vals]], [:replace, attr, [vals]]
+    # dn is the object to modify; modification is a hash of
+    #   attr => [:add, val, val...]       -- add operation
+    #   attr => [val, val...]             -- replace operation
+    #   attr => []                        -- delete operation
 
     def modify(dn, modification)
       raise LDAP::ResultError::UnwillingToPerform, "modify not implemented"

@@ -192,7 +192,7 @@ class Server
 	(?: MUST #{OIDS} )?
 	(?: MAY #{OIDS} )?
     \s* \) \s* \z !xu)
-    add("1.3.6.1.4.1.1466.115.121.1.38", "OID", true, /\A#{WOID}\z/)
+    add("1.3.6.1.4.1.1466.115.121.1.38", "OID", true, /\A#{WOID}\z/xu)
     add("1.3.6.1.4.1.1466.115.121.1.39", "Other Mailbox", true)
     add("1.3.6.1.4.1.1466.115.121.1.41", "Postal Address", true) do
       def self.value_from_s(v)

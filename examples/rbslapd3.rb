@@ -133,28 +133,11 @@ class DirOperation < LDAP::Server::Operation
 
   def modify(dn, ops)
     dn.downcase!
-    # FIXME: validate
     @dir.lock do
       @dir.update
       entry = @dir.data[dn]
       raise LDAP::ResultError::NoSuchObject unless entry
-      ops.each do |op, attr, vals|
-        case op 
-        when :add
-          entry[attr] ||= []
-          entry[attr] += vals
-          entry[attr].uniq!
-        when :delete
-          if vals == []
-            entry.delete(attr)
-          else
-            vals.each { |v| entry[attr].delete(v) }
-          end
-        when :replace
-          entry[attr] = vals
-        end
-        entry.delete(attr) if entry[attr] == []
-      end
+      @dir.data[dn] = @schema.validate(ops, entry)
       @dir.write
     end
   end

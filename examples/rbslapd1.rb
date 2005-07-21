@@ -54,7 +54,8 @@ class HashOperation < LDAP::Server::Operation
   def modify(dn, ops)
     entry = @hash[dn]
     raise LDAP::ResultError::NoSuchObject unless entry
-    ops.each do |op, attr, vals|
+    ops.each do |attr, vals|
+      op = vals.shift
       case op 
       when :add
         entry[attr] ||= []
