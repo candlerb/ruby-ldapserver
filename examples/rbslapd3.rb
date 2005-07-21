@@ -12,8 +12,8 @@
 # - client connections can't share state in RAM. So our shared directory
 #   now has to be read from disk, and flushed to disk after every update.
 #
-# Additionally, I have added basic schema support. An LDAP v3 client can
-# query the schema remotely. TODO: Add data validation using schema.
+# Additionally, I have added schema support. An LDAP v3 client can
+# query the schema remotely, and adds/modifies have data validated.
 
 $:.unshift('../lib')
 
@@ -107,16 +107,18 @@ class DirOperation < LDAP::Server::Operation
     end
   end
 
-  def add(dn, av)
-    av = @schema.validate(av)
+  def add(dn, entry)
+    entry = @schema.validate(entry)
+    # FIXME: normalize the DN and check it's below our root DN
     # FIXME: validate that a superior object exists
-    # FIXME: validate that av contains the RDN attribute (yuk)
-    # FIXME: handle operational attributes like modifyTimestamp
+    # FIXME: validate that entry contains the RDN attribute (yuk)
     dn.downcase!
     @dir.lock do
       @dir.update
       raise LDAP::ResultError::EntryAlreadyExists if @dir.data[dn]
-      @dir.data[dn] = av
+      entry['createTimestamp'] = Time.now.gmtime.strftime("%Y%m%d%H%MZ")
+      entry['creatorsName'] = @connection.binddn
+      @dir.data[dn] = entry
       @dir.write
     end
   end
@@ -137,7 +139,9 @@ class DirOperation < LDAP::Server::Operation
       @dir.update
       entry = @dir.data[dn]
       raise LDAP::ResultError::NoSuchObject unless entry
-      @dir.data[dn] = @schema.validate(ops, entry)
+      entry['modifyTimestamp'] = Time.now.gmtime.strftime("%Y%m%d%H%MZ")
+      entry['modifiersName'] = @connection.binddn
+      @dir.data[dn] = @schema.validate(ops, entry)  # also does the update
       @dir.write
     end
   end

@@ -375,7 +375,7 @@ EOS
       unless oc.find { |objectclass| objectclass.name == 'extensibleObject' }
         # Now check all the attributes given are permitted by MUST or MAY
         res.each_key do |attr|
-          unless allow_attr[attr]
+          unless allow_attr[attr] or find_attrtype(attr).usage == :directoryOperation
             raise LDAP::ResultError::ObjectClassViolation, "Attribute #{attr} not permitted by objectClass"
           end
         end
