@@ -295,6 +295,7 @@ EOS
           checkvals = nv[1..-1]
           vals += checkvals
           vals.uniq!   # FIXME: ?? error if duplicate values
+          # FIXME: normalize values? e.g. c: gb and c: GB are same value.
         when :delete
           nv = nv[1..-1]
           if nv.empty?
@@ -308,14 +309,14 @@ EOS
           vals = checkvals = nv
         end
         if vals == []
-          res.delete[attrname]
+          res.delete(attrname)
         else
           res[attrname] = vals
         end
 
         # Attribute validation
         raise LDAP::ResultError::ObjectClassViolation,
-          "Attribute #{attr} is SINGLE-VALUE" if attr.singlevalue and vals.size != 1
+          "Attribute #{attr} is SINGLE-VALUE" if attr.singlevalue and vals.size > 1
 
         checkvals.each do |val|
           raise LDAP::ResultError::InvalidAttributeSyntax,
@@ -348,9 +349,12 @@ EOS
         res['objectClass'] = oc.collect { |oo| oo.to_s }
 
         # Check that exactly one structural objectClass is present
-        unless oc.find_all { |s| s.struct == :structural }.size == 1
+        unless oc.find_all { |s| s.struct == :structural }.size >= 1
           raise LDAP::ResultError::ObjectClassViolation,
-            "Entry must have at exactly one structural objectClass"
+            "Entry must have at least one structural objectClass"
+            # Exactly one? But you have to sort out the inheritance problem
+            # (e.g. both person and organizationalPerson are declared
+            # structural)
         end
       end
 
@@ -358,13 +362,13 @@ EOS
       allow_attr = {}
       oc.each do |objectclass|
         objectclass.must.each do |m|
-          unless res[m] and res[m] != []
+          unless res[m.name] and res[m.name] != []
             raise LDAP::ResultError::ObjectClassViolation, "Missing attribute #{m} required by objectClass #{objectclass}"
           end
-          allow_attr[m] = true
+          allow_attr[m.name] = true
         end
         objectclass.may.each do |m|
-          allow_attr[m] = true
+          allow_attr[m.name] = true
         end
       end
 

@@ -254,11 +254,11 @@ class TestLdap < Test::Unit::TestCase
 
   def test_modify
     req("modify")
-    assert_equal([:modify, "dc=localhost, dc=domain", [
-        [:add, 'objectclass', ['top', 'domain']],
-        [:delete, 'o', []],
-        [:replace, 'dc', ['localhost']],
-    ]], MockOperation.lastop)
+    assert_equal([:modify, "dc=localhost, dc=domain", {
+        'objectclass' => [:add, 'top', 'domain'],
+        'o' => [:delete],
+        'dc' => [:replace, 'localhost'],
+    }], MockOperation.lastop)
   end
 
   def test_search
