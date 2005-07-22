@@ -1,7 +1,8 @@
 #!/usr/local/bin/ruby -w
 
 # This is similar to rbslapd1.rb but here we use TOMITA Masahiro's prefork
-# library. Advantages over Ruby threading:
+# library: <http://raa.ruby-lang.org/project/prefork/>
+# Advantages over Ruby threading:
 # - each client connection is handled in its own process; don't need
 #   to worry about Ruby thread blocking (except if one client issues
 #   overlapping LDAP operations down the same connection, which is uncommon)

@@ -83,3 +83,7 @@ sn: Flintstone
 telephoneNumber: +1 555 1234
 telephoneNumber: +1 555 5432
 
+Schema validation takes place for the attribute values and that attributes
+are allowed/required by the objectclass(es); however, the DN itself is not
+validated, nor any checks made that the RDN is present as an attribute
+(since this is one of the more stupid parts of the LDAP/X500 data model)
