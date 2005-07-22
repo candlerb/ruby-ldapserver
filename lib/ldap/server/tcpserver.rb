@@ -52,6 +52,7 @@ class Server
               s.instance_eval(&blk)
             rescue Exception => e
               logger << "[#{s.peeraddr[3]}]: #{e}: #{e.backtrace[0]}\n"
+              #logger << "[#{s.peeraddr[3]}]: #{e}: #{e.backtrace.join("\n\tfrom ")}\n"
             ensure
               s.close
             end

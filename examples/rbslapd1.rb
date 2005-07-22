@@ -5,6 +5,7 @@
 # demonstrate the API, it's not for real-world use!!
 
 $:.unshift('../lib')
+$debug = true
 
 require 'ldap/server'
 

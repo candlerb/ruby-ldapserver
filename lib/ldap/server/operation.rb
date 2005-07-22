@@ -33,6 +33,14 @@ class Server
       @server = @connection.opt[:server]
     end
 
+    def log(*args)
+      @connection.log(*args)
+    end
+
+    def log_exception(e)
+      @connection.log "#{e}: #{e.backtrace.join("\n\tfrom ")}"
+    end
+
     ##################################################
     ### Utility methods to send protocol responses ###
     ##################################################
@@ -109,11 +117,12 @@ class Server
         else
           vals = [vals] unless vals.kind_of?(Array)
           # FIXME: optionally do a value_to_s conversion here?
+          # FIXME: handle attribute;binary
         end
 
         avseq << OpenSSL::ASN1::Sequence([
           OpenSSL::ASN1::OctetString(attr),
-          OpenSSL::ASN1::Set(vals.collect { |v| OpenSSL::ASN1::OctetString(v) })
+          OpenSSL::ASN1::Set(vals.collect { |v| OpenSSL::ASN1::OctetString(v.to_s) })
         ])
       end
 
@@ -234,11 +243,14 @@ class Server
                    (@sizelimit.nil? or client_sizelimit < @sizelimit)
 
       if baseObject.empty? and scope == BaseObject
-        send_SearchResultEntry("", @server.root_dse) if LDAP::Server::Filter.run(filter, @server.root_dse)
+        send_SearchResultEntry("", @server.root_dse) if
+          @server.root_dse and LDAP::Server::Filter.run(filter, @server.root_dse)
         send_SearchResultDone(0)
         return
       elsif @schema and baseObject == @schema.subschema_dn
-        send_SearchResultEntry(baseObject, @schema.subschema_subentry) if LDAP::Server::Filter.run(filter, @schema.subschema_subentry)
+        send_SearchResultEntry(baseObject, @schema.subschema_subentry) if
+          @schema and @schema.subschema_subentry and
+          LDAP::Server::Filter.run(filter, @schema.subschema_subentry)
         send_SearchResultDone(0)
         return
       end
@@ -264,7 +276,7 @@ class Server
     # forever for a response.
 
     rescue Exception => e
-      @connection.log "#{e}: #{e.backtrace[0]}"
+      log_exception(e)
       send_SearchResultDone(LDAP::ResultError::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
@@ -297,7 +309,7 @@ class Server
     rescue Abandon
       # no response
     rescue Exception => e
-      @connection.log "#{e}: #{e.backtrace[0]}"
+      log_exception(e)
       send_ModifyResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
@@ -312,7 +324,7 @@ class Server
     rescue Abandon
       # no response
     rescue Exception => e
-      @connection.log "#{e}: #{e.backtrace[0]}"
+      log_exception(e)
       send_AddResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
@@ -326,7 +338,7 @@ class Server
     rescue Abandon
       # no response
     rescue Exception => e
-      @connection.log "#{e}: #{e.backtrace[0]}"
+      log_exception(e)
       send_DelResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
@@ -345,7 +357,7 @@ class Server
     rescue Abandon
       # no response
     rescue Exception => e
-      @connection.log "#{e}: #{e.backtrace[0]}"
+      log_exception(e)
       send_ModifyDNResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
@@ -368,7 +380,7 @@ class Server
     rescue Abandon
       # no response
     rescue Exception => e
-      @connection.log "#{e}: #{e.backtrace[0]}"
+      log_exception(e)
       send_CompareResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 

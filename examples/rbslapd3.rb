@@ -117,8 +117,8 @@ class DirOperation < LDAP::Server::Operation
     @dir.lock do
       @dir.update
       raise LDAP::ResultError::EntryAlreadyExists if @dir.data[dn]
-      entry['createTimestamp'] = Time.now.gmtime.strftime("%Y%m%d%H%MZ")
-      entry['creatorsName'] = @connection.binddn
+      entry['createTimestamp'] = [Time.now.gmtime.strftime("%Y%m%d%H%MZ")]
+      entry['creatorsName'] = [@connection.binddn.to_s]
       @dir.data[dn] = entry
       @dir.write
     end
@@ -140,9 +140,11 @@ class DirOperation < LDAP::Server::Operation
       @dir.update
       entry = @dir.data[dn]
       raise LDAP::ResultError::NoSuchObject unless entry
-      entry['modifyTimestamp'] = Time.now.gmtime.strftime("%Y%m%d%H%MZ")
-      entry['modifiersName'] = @connection.binddn
-      @dir.data[dn] = @schema.validate(ops, entry)  # also does the update
+      entry = @dir.data[dn]
+      entry = @schema.validate(ops, entry)  # also does the update
+      entry['modifyTimestamp'] = [Time.now.gmtime.strftime("%Y%m%d%H%MZ")]
+      entry['modifiersName'] = [@connection.binddn.to_s]
+      @dir.data[dn] = entry
       @dir.write
     end
   end
