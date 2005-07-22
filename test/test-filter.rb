@@ -10,7 +10,6 @@ class FilterTest < Test::Unit::TestCase
     "foo" => ["abc","def"],
     "bar" => ["wibblespong"],
   }
-  DM = LDAP::Server::MatchingRule::DefaultMatch
 
   def test_bad
     assert_raises(LDAP::ResultError::OperationsError) {
@@ -30,10 +29,10 @@ class FilterTest < Test::Unit::TestCase
   end
 
   def test_eq
-    assert_equal(true, LDAP::Server::Filter.run([:eq,"foo",DM,"abc"], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:eq,"foo",DM,"def"], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:eq,"foo",DM,"ghi"], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:eq,"xyz",DM,"abc"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:eq,"foo",nil,"abc"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:eq,"foo",nil,"def"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:eq,"foo",nil,"ghi"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:eq,"xyz",nil,"abc"], AV1))
   end
 
   def test_eq_case
@@ -45,45 +44,45 @@ class FilterTest < Test::Unit::TestCase
   end
 
   def test_not
-    assert_equal(false, LDAP::Server::Filter.run([:not,[:eq,"foo",DM,"abc"]], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:not,[:eq,"foo",DM,"def"]], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:not,[:eq,"foo",DM,"ghi"]], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:not,[:eq,"xyz",DM,"abc"]], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:not,[:eq,"foo",nil,"abc"]], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:not,[:eq,"foo",nil,"def"]], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:not,[:eq,"foo",nil,"ghi"]], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:not,[:eq,"xyz",nil,"abc"]], AV1))
   end
 
   def test_ge
-    assert_equal(true, LDAP::Server::Filter.run([:ge,"foo",DM,"ccc"], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:ge,"foo",DM,"def"], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:ge,"foo",DM,"deg"], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:ge,"xyz",DM,"abc"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:ge,"foo",nil,"ccc"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:ge,"foo",nil,"def"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:ge,"foo",nil,"deg"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:ge,"xyz",nil,"abc"], AV1))
   end
 
   def test_le
-    assert_equal(true, LDAP::Server::Filter.run([:le,"foo",DM,"ccc"], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:le,"foo",DM,"abc"], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:le,"foo",DM,"abb"], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:le,"xyz",DM,"abc"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:le,"foo",nil,"ccc"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:le,"foo",nil,"abc"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:le,"foo",nil,"abb"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:le,"xyz",nil,"abc"], AV1))
   end
 
   def test_substrings
-    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",DM,"a",nil], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",DM,"def",nil], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",DM,"bc",nil], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",DM,"az",nil], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",DM,"",nil], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:substrings,"zzz",DM,"",nil], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",DM,nil,"a",nil], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",DM,nil,"e",nil], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",DM,nil,"ba",nil], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",DM,nil,"az",nil], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",DM,nil,"c"], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",DM,nil,"ef"], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",DM,nil,"ab"], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",DM,nil,"e"], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:substrings,"bar",DM,"wib","ong"], AV1))
-    assert_equal(true, LDAP::Server::Filter.run([:substrings,"bar",DM,"",""], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:substrings,"bar",DM,"wib","ble"], AV1))
-    assert_equal(false, LDAP::Server::Filter.run([:substrings,"bar",DM,"sp","ong"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",nil,"a",nil], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",nil,"def",nil], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",nil,"bc",nil], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",nil,"az",nil], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",nil,"",nil], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:substrings,"zzz",nil,"",nil], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",nil,nil,"a",nil], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",nil,nil,"e",nil], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",nil,nil,"ba",nil], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",nil,nil,"az",nil], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",nil,nil,"c"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:substrings,"foo",nil,nil,"ef"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",nil,nil,"ab"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:substrings,"foo",nil,nil,"e"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:substrings,"bar",nil,"wib","ong"], AV1))
+    assert_equal(true, LDAP::Server::Filter.run([:substrings,"bar",nil,"",""], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:substrings,"bar",nil,"wib","ble"], AV1))
+    assert_equal(false, LDAP::Server::Filter.run([:substrings,"bar",nil,"sp","ong"], AV1))
   end
 
   def test_substr_case

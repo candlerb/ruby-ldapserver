@@ -1,4 +1,6 @@
-Minor changes to syntax.rb to support OpenLDAP extensions
+Changed filters to return nil instead of LDAP::Server::MatchingRule::DefaultMatch
+in the case that there's no schema.
+Minor changes to syntax.rb to support OpenLDAP extensions.
 
 20050722
 

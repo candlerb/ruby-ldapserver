@@ -30,15 +30,16 @@ class Server
   # by the client. If a schema is provided: attr is converted to its
   # normalized name as listed in the schema, e.g. 'commonname' becomes 'cn',
   # 'objectclass' becomes 'objectClass' etc.
-  # MO is a matching object which can be used to perform the match - either
-  # found via the schema, or a default object if there's no schema.
+  # If a schema is provided, MO is a matching object which can be used to
+  # perform the match. If no schema is provided, this is 'nil'. In that
+  # case you could use LDAP::Server::MatchingRule::DefaultMatch.
 
   class Filter
 
     # Parse a filter in OpenSSL::ASN1 format into our own format.
     #
     # There are some trivial optimisations we make: e.g.
-    #   (&(objectclass=*)(cn=foo)) -> (&(cn=foo)) -> (cn=foo)
+    #   (&(objectClass=*)(cn=foo)) -> (&(cn=foo)) -> (cn=foo)
 
     def self.parse(asn1, schema=nil)
       case asn1.tag
@@ -70,22 +71,22 @@ class Server
       when 3 # equalityMatch
         attr = asn1.value[0].value
         val = asn1.value[1].value
-        return [:true] if attr =~ /^objectclass$/i and val == "top"
+        return [:true] if attr =~ /\AobjectClass\z/i and val =~ /\Atop\z/i
         if schema
           a = schema.find_attrtype(attr)
-          return [:undef] unless a and a.equality
+          return [:undef] unless a.equality
           return [:eq, a.to_s, a.equality, val]
         end
-        return [:eq, attr, LDAP::Server::MatchingRule::DefaultMatch, val]
+        return [:eq, attr, nil, val]
 
       when 4 # substrings
         attr = asn1.value[0].value
         if schema
           a = schema.find_attrtype(attr)
-          return [:undef] unless a and a.substr
+          return [:undef] unless a.substr
           res = [:substrings, a.to_s, a.substr, nil]
         else
-          res = [:substrings, attr, LDAP::Server::MatchingRule::DefaultMatch, nil]
+          res = [:substrings, attr, nil, nil]
         end
         final_val = nil
 
@@ -110,24 +111,24 @@ class Server
         val = asn1.value[1].value
         if schema
           a = schema.find_attrtype(attr)
-          return [:undef] unless a and a.ordering
+          return [:undef] unless a.ordering
           return [:ge, a.to_s, a.ordering, val]
         end
-        return [:ge, attr, LDAP::Server::MatchingRule::DefaultMatch, val]
+        return [:ge, attr, nil, val]
 
       when 6 # lessOrEqual
         attr = asn1.value[0].value
         val = asn1.value[1].value
         if schema
           a = schema.find_attrtype(attr)
-          return [:undef] unless a and a.ordering
+          return [:undef] unless a.ordering
           return [:le, a.to_s, a.ordering, val]
         end
-        return [:le, attr, LDAP::Server::MatchingRule::DefaultMatch, val]
+        return [:le, attr, nil, val]
 
       when 7 # present
         attr = asn1.value
-        return [:true] if attr =~ /^objectclass$/i
+        return [:true] if attr =~ /\AobjectClass\z/i
         if schema
           begin
             a = schema.find_attrtype(attr)
@@ -146,10 +147,10 @@ class Server
           # I don't know how properly to deal with approxMatch. I'm assuming
           # that the object will have an equality MatchingRule, and we
           # can defer to that.
-          return [:undef] unless a and a.equality
+          return [:undef] unless a.equality
           return [:approx, a.to_s, a.equality, val]
         end
-        return [:approx, attr, LDAP::Server::MatchingRule::DefaultMatch, val]
+        return [:approx, attr, nil, val]
 
       #when 9 # extensibleMatch
       #  FIXME
@@ -200,7 +201,8 @@ class Server
 
       when :eq, :approx, :le, :ge, :substrings
         # the filter now includes a suitable matching object
-        return filter[2].send(filter.first, av[filter[1].to_s], *filter[3..-1])
+        return (filter[2] || LDAP::Server::MatchingRule::DefaultMatch).send(
+                filter.first, av[filter[1].to_s], *filter[3..-1])
 
       when :true
         return true
