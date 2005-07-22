@@ -28,8 +28,8 @@ class Server
     # Drop privileges if requested
     if opt[:group] or opt[:user]
       require 'etc'
-      uid = Etc.getgrnam(opt[:group]).gid if opt[:group]
-      gid = Etc.getpwnam(opt[:user]).uid if opt[:user]
+      gid = Etc.getgrnam(opt[:group]).gid if opt[:group]
+      uid = Etc.getpwnam(opt[:user]).uid if opt[:user]
       File.chown(uid, gid, server.instance_eval {@lockf})
       Process.egid = gid if gid
       Process.euid = uid if uid
