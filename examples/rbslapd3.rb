@@ -110,6 +110,8 @@ class DirOperation < LDAP::Server::Operation
 
   def add(dn, entry)
     entry = @schema.validate(entry)
+    entry['createTimestamp'] = [Time.now.gmtime.strftime("%Y%m%d%H%MZ")]
+    entry['creatorsName'] = [@connection.binddn.to_s]
     # FIXME: normalize the DN and check it's below our root DN
     # FIXME: validate that a superior object exists
     # FIXME: validate that entry contains the RDN attribute (yuk)
@@ -117,8 +119,6 @@ class DirOperation < LDAP::Server::Operation
     @dir.lock do
       @dir.update
       raise LDAP::ResultError::EntryAlreadyExists if @dir.data[dn]
-      entry['createTimestamp'] = [Time.now.gmtime.strftime("%Y%m%d%H%MZ")]
-      entry['creatorsName'] = [@connection.binddn.to_s]
       @dir.data[dn] = entry
       @dir.write
     end
@@ -140,7 +140,6 @@ class DirOperation < LDAP::Server::Operation
       @dir.update
       entry = @dir.data[dn]
       raise LDAP::ResultError::NoSuchObject unless entry
-      entry = @dir.data[dn]
       entry = @schema.validate(ops, entry)  # also does the update
       entry['modifyTimestamp'] = [Time.now.gmtime.strftime("%Y%m%d%H%MZ")]
       entry['modifiersName'] = [@connection.binddn.to_s]
