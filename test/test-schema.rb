@@ -1,4 +1,4 @@
-$:.unshift '../lib'
+$:.unshift('../lib').uniq!
 require 'ldap/server/schema'
 require 'ldap/server/match'
 require 'test/unit'

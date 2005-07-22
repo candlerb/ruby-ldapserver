@@ -1,6 +1,6 @@
 #!/usr/local/bin/ruby -w
 
-$:.unshift('../lib')
+$:.unshift('../lib').uniq!
 
 require 'ldap/server/util'
 require 'test/unit'

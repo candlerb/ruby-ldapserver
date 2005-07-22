@@ -9,7 +9,7 @@ Thread.abort_on_exception = true
 # LDAP requests, which is nasty. However, it does give us a completely
 # independent source of LDAP packets to try.
 
-$:.unshift('../lib')
+$:.unshift('../lib').uniq!
 
 require 'ldap/server/operation'
 require 'ldap/server/server'

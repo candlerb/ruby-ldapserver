@@ -1,4 +1,4 @@
-$:.unshift '../lib'
+$:.unshift('../lib').uniq!
 require 'ldap/server/syntax'
 require 'test/unit'
 
