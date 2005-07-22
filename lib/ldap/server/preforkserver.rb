@@ -31,8 +31,8 @@ class Server
       gid = Etc.getgrnam(opt[:group]).gid if opt[:group]
       uid = Etc.getpwnam(opt[:user]).uid if opt[:user]
       File.chown(uid, gid, server.instance_eval {@lockf})
-      Process.egid = gid if gid
-      Process.euid = uid if uid
+      Process.gid = Process.egid = gid if gid
+      Process.uid = Process.euid = uid if uid
     end
 
     # Typically the O/S will buffer response data for 100ms before sending.

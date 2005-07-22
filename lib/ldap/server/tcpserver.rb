@@ -27,8 +27,8 @@ class Server
 
     # Drop privileges if requested
     require 'etc' if opt[:group] or opt[:user]
-    Process.egid = Etc.getgrnam(opt[:group]).gid if opt[:group]
-    Process.euid = Etc.getpwnam(opt[:user]).uid if opt[:user]
+    Process.gid = Process.egid = Etc.getgrnam(opt[:group]).gid if opt[:group]
+    Process.uid = Process.euid = Etc.getpwnam(opt[:user]).uid if opt[:user]
    
     # Typically the O/S will buffer response data for 100ms before sending.
     # If the response is sent as a single write() then there's no need for it.
