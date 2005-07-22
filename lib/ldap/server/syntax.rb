@@ -3,18 +3,19 @@ class Server
 
   # A class which describes LDAP SyntaxDescriptions. For now there is
   # a global pool of Syntax objects (rather than each Schema object
-  # having its own pool)
+  # having its own set)
 
   class Syntax
-    attr_reader :oid, :hr, :desc
+    attr_reader :oid, :nhr, :binary, :desc
 
     # Create a new Syntax object
 
-    def initialize(oid, desc=nil, hr=false, re=nil, &blk)
+    def initialize(oid, desc=nil, opt={}, &blk)
       @oid = oid
       @desc = desc
-      @hr = hr	# human-readable?
-      @re = re  # regular expression for parsing
+      @nhr = opt[:nhr]		# not human-readable?
+      @binary = opt[:binary]	# binary encoding forced?
+      @re = opt[:re]		# regular expression for parsing
       @def = nil
       instance_eval(&blk) if blk
     end
@@ -25,11 +26,11 @@ class Server
 
     # Create a new Syntax object, given its description string
 
-    def self.from_def(str, *args, &blk)
+    def self.from_def(str, &blk)
       m = LDAPSyntaxDescription.match(str)
       raise LDAP::ResultError::InvalidAttributeSyntax,
         "Bad SyntaxTypeDescription #{str.inspect}" unless m
-      new(m[1], m[2], *args, &blk)
+      new(m[1], m[2], :nhr=>(m[3] == 'TRUE'), :binary=>(m[4] == 'TRUE'), &blk)
     end
 
     # Convert this object to its description string
@@ -38,6 +39,9 @@ class Server
       return @def if @def
       ans = "( #@oid "
       ans << "DESC '#@desc' " if @desc
+      # These are OpenLDAP extensions
+      ans << "X-BINARY-TRANSFER-REQUIRED 'TRUE' " if @binary
+      ans << "X-NOT-HUMAN-READABLE 'TRUE' " if @nhr
       ans << ")"
       @def = ans
     end
@@ -51,12 +55,14 @@ class Server
     end
 
     # Convert a value for this syntax into its canonical string representation
+    # (not yet used, but seemed like a good idea)
 
     def value_to_s(val)
       val.to_s
     end
 
     # Convert a string value for this syntax into a Ruby-like value
+    # (not yet used, but seemed like a good idea)
 
     def value_from_s(val)
       val
@@ -106,7 +112,7 @@ class Server
     # These are the 'SHOULD' support syntaxes from RFC2252 section 6
 
     AttributeTypeDescription =
-    add("1.3.6.1.4.1.1466.115.121.1.3", "Attribute Type Description", true,
+    add("1.3.6.1.4.1.1466.115.121.1.3", "Attribute Type Description", :re=>
     %r! \A \s* \( \s*
 	    #{NUMERICOID} \s*
 	(?: NAME #{QDESCRS} )?
@@ -123,13 +129,13 @@ class Server
 	(?: USAGE \s* #{ATTRIBUTEUSAGE} )?
     \s* \) \s* \z !xu)
 
-    add("1.3.6.1.4.1.1466.115.121.1.5", "Binary", false)
+    add("1.3.6.1.4.1.1466.115.121.1.5", "Binary", :nhr=>true)
     # FIXME: value_to_s should BER-encode the value??
 
-    add("1.3.6.1.4.1.1466.115.121.1.6", "Bit String", true, /\A'([01]*)'B\z/)
+    add("1.3.6.1.4.1.1466.115.121.1.6", "Bit String", :re=>/\A'([01]*)'B\z/)
     # FIXME: convert to FixNum?
 
-    add("1.3.6.1.4.1.1466.115.121.1.7", "Boolean", true, /\A(TRUE|FALSE)\z/) do
+    add("1.3.6.1.4.1.1466.115.121.1.7", "Boolean", :re=>/\A(TRUE|FALSE)\z/) do
       def self.value_to_s(v)
         return v if v.is_a?(string)
         v ? "TRUE" : "FALSE"
@@ -139,27 +145,27 @@ class Server
       end
     end
 
-    add("1.3.6.1.4.1.1466.115.121.1.8", "Certificate", false)
-    add("1.3.6.1.4.1.1466.115.121.1.9", "Certificate List", false)
-    add("1.3.6.1.4.1.1466.115.121.1.10", "Certificate Pair", false)
-    add("1.3.6.1.4.1.1466.115.121.1.11", "Country String", true, /\A[A-Z]{2}\z/)
-    add("1.3.6.1.4.1.1466.115.121.1.12", "DN", true)
+    add("1.3.6.1.4.1.1466.115.121.1.8", "Certificate", :binary=>true, :nhr=>true)
+    add("1.3.6.1.4.1.1466.115.121.1.9", "Certificate List", :binary=>true, :nhr=>true)
+    add("1.3.6.1.4.1.1466.115.121.1.10", "Certificate Pair", :binary=>true, :nhr=>true)
+    add("1.3.6.1.4.1.1466.115.121.1.11", "Country String", :re=>/\A[A-Z]{2}\z/i)
+    add("1.3.6.1.4.1.1466.115.121.1.12", "Distinguished Name")
     # FIXME: validate DN?
-    add("1.3.6.1.4.1.1466.115.121.1.15", "Directory String", true)
+    add("1.3.6.1.4.1.1466.115.121.1.15", "Directory String")
     # missed due to lack of interest: "DIT Content Rule Description"
-    add("1.3.6.1.4.1.1466.115.121.1.22", "Facsimile Telephone Number", true)
-    add(" 1.3.6.1.4.1.1466.115.121.1.23", "Fax", false)
-    add("1.3.6.1.4.1.1466.115.121.1.24", "Generalized Time", true)
-    # FIXME: Validate Generalized Time (find X.208) and convert to/from Ruby
-    add("1.3.6.1.4.1.1466.115.121.1.26", "IA5 String", true)
-    add("1.3.6.1.4.1.1466.115.121.1.27", "Integer", true, /\A\d+\z/) do
+    add("1.3.6.1.4.1.1466.115.121.1.22", "Facsimile Telephone Number")
+    add(" 1.3.6.1.4.1.1466.115.121.1.23", "Fax", :nhr=>true)
+    add("1.3.6.1.4.1.1466.115.121.1.24", "Generalized Time")
+    # FIXME: Validate Generalized Time (find X.208) and convert to/from Ruby Time
+    add("1.3.6.1.4.1.1466.115.121.1.26", "IA5 String")
+    add("1.3.6.1.4.1.1466.115.121.1.27", "Integer", :re=>/\A\d+\z/) do
       def self.value_from_s(v)
         v.to_i
       end
     end
-    add("1.3.6.1.4.1.1466.115.121.1.28", "JPEG", false)
+    add("1.3.6.1.4.1.1466.115.121.1.28", "JPEG", :nhr=>true)
     MatchingRuleDescription =
-    add("1.3.6.1.4.1.1466.115.121.1.30", "Matching Rule Description", true,
+    add("1.3.6.1.4.1.1466.115.121.1.30", "Matching Rule Description", :re=>
     %r! \A \s* \( \s*
 	    #{NUMERICOID} \s*
 	(?: NAME #{QDESCRS} )?
@@ -168,7 +174,7 @@ class Server
 	    SYNTAX \s* #{NUMERICOID} \s*
     \s* \) \s* \z !xu)
     MatchingRuleUseDescription =
-    add("1.3.6.1.4.1.1466.115.121.1.31", "Matching Rule Use Description", true,
+    add("1.3.6.1.4.1.1466.115.121.1.31", "Matching Rule Use Description", :re=>
     %r! \A \s* \( \s*
 	    #{NUMERICOID} \s*
 	(?: NAME #{QDESCRS} )?
@@ -176,12 +182,12 @@ class Server
 	(   OBSOLETE \s* )?
 	    APPLIES \s* #{OIDS} \s*
     \s* \) \s* \z !xu)
-    add("1.3.6.1.4.1.1466.115.121.1.33", "MHS OR Address", true)
-    add("1.3.6.1.4.1.1466.115.121.1.34", "Name and Optional UID", true)
+    add("1.3.6.1.4.1.1466.115.121.1.33", "MHS OR Address")
+    add("1.3.6.1.4.1.1466.115.121.1.34", "Name And Optional UID")
     # missed due to lack of interest: "Name Form Description"
-    add("1.3.6.1.4.1.1466.115.121.1.36", "Numeric String", true, /\A\d+\z/)
+    add("1.3.6.1.4.1.1466.115.121.1.36", "Numeric String", :re=>/\A\d+\z/)
     ObjectClassDescription =
-    add("1.3.6.1.4.1.1466.115.121.1.37", "Object Class Description", true,
+    add("1.3.6.1.4.1.1466.115.121.1.37", "Object Class Description", :re=>
     %r! \A \s* \( \s*
 	#{NUMERICOID} \s*
 	(?: NAME #{QDESCRS} )?
@@ -192,9 +198,9 @@ class Server
 	(?: MUST #{OIDS} )?
 	(?: MAY #{OIDS} )?
     \s* \) \s* \z !xu)
-    add("1.3.6.1.4.1.1466.115.121.1.38", "OID", true, /\A#{WOID}\z/xu)
-    add("1.3.6.1.4.1.1466.115.121.1.39", "Other Mailbox", true)
-    add("1.3.6.1.4.1.1466.115.121.1.41", "Postal Address", true) do
+    add("1.3.6.1.4.1.1466.115.121.1.38", "OID", :re=>/\A#{WOID}\z/xu)
+    add("1.3.6.1.4.1.1466.115.121.1.39", "Other Mailbox")
+    add("1.3.6.1.4.1.1466.115.121.1.41", "Postal Address") do
       def self.value_from_s(v)
         v.split(/\$/)
       end
@@ -203,24 +209,26 @@ class Server
         return v
       end
     end
-    add("1.3.6.1.4.1.1466.115.121.1.43", "Presentation Address", true)
-    add("1.3.6.1.4.1.1466.115.121.1.44", "Printable String", true)
-    add("1.3.6.1.4.1.1466.115.121.1.50", "Telephone Number", true)
-    add("1.3.6.1.4.1.1466.115.121.1.53", "UTC Time", true)
+    add("1.3.6.1.4.1.1466.115.121.1.43", "Presentation Address")
+    add("1.3.6.1.4.1.1466.115.121.1.44", "Printable String")
+    add("1.3.6.1.4.1.1466.115.121.1.50", "Telephone Number")
+    add("1.3.6.1.4.1.1466.115.121.1.53", "UTC Time")
 
     LDAPSyntaxDescription =
-    add("1.3.6.1.4.1.1466.115.121.1.54", "LDAP Syntax Description", true,
+    add("1.3.6.1.4.1.1466.115.121.1.54", "LDAP Syntax Description", :re=>
     %r! \A \s* \( \s*
 	    #{NUMERICOID} \s*
 	(?: DESC #{QDSTRING} )?
+	(?: X-BINARY-TRANSFER-REQUIRED \s* ' (TRUE|FALSE) ' \s* )?
+	(?: X-NOT-HUMAN-READABLE \s* ' (TRUE|FALSE) ' \s* )?
     \s* \) \s* \z !xu)
 
     # Missed due to lack of interest: "DIT Structure Rule Description"
 
     # A few others from RFC2252 section 4.3.2
-    add("1.3.6.1.4.1.1466.115.121.1.4", "Audio", false)
-    add("1.3.6.1.4.1.1466.115.121.1.40", "Octet String", true)
-    add("1.3.6.1.4.1.1466.115.121.1.58", "Substring Assertion", true)
+    add("1.3.6.1.4.1.1466.115.121.1.4", "Audio", :nhr=>true)
+    add("1.3.6.1.4.1.1466.115.121.1.40", "Octet String")
+    add("1.3.6.1.4.1.1466.115.121.1.58", "Substring Assertion")
   end
     
 end # class Server

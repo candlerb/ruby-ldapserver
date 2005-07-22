@@ -1,3 +1,7 @@
+Minor changes to syntax.rb to support OpenLDAP extensions
+
+20050722
+
 Change the 'validate' API so it works for updates too.
 Change the 'modify' API so it sends a hash of attr=>[:op,data] which makes
 it easier to determine which entries have been modified.

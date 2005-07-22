@@ -12,7 +12,7 @@ class Server
   class Schema
 
     SUBSCHEMA_ENTRY_ATTR = 'cn'
-    SUBSCHEMA_ENTRY_VALUE = 'subschema'
+    SUBSCHEMA_ENTRY_VALUE = 'Subschema'
 
     def initialize
       @attrtypes = {}		# name/alias/oid => AttributeType instance
