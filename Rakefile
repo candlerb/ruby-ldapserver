@@ -1,4 +1,4 @@
-task :default => [:src]
+task :default => [:rdoc]
 
 VER="0.3"
 

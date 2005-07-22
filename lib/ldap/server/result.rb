@@ -61,7 +61,7 @@ class ResultError
 
   N_TO_CLASS = {
     53 => UnwillingToPerform,
-    # please fill in the rest
+    # FIXME: please fill in the rest
   }
   def self.[] (n)
     return N_TO_CLASS[n] || self

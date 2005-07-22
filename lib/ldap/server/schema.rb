@@ -202,7 +202,7 @@ objectClass ( 2.5.6.0 NAME 'top' DESC 'top of the superclass chain' ABSTRACT MUS
 EOS
     end
 
-    # After loading object classes and attrs: resolve oid strings to point
+    # After loading object classes and attr types: resolve oid strings to point
     # to objects. This will expose schema inconsistencies (e.g. objectclass
     # has unknown SUP class or points to unknown attributeType). However,
     # unknown Syntaxes just create new Syntax objects.

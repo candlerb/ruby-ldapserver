@@ -14,7 +14,7 @@ CHILDREN.times do
       conn.set_option(LDAP::LDAP_OPT_PROTOCOL_VERSION, 3)
       conn.bind
       SEARCHES.times do
-        res = conn.search("uid=1,dc=example,dc=com", LDAP::LDAP_SCOPE_BASE,
+        res = conn.search("cn=Fred Flintstone,dc=example,dc=com", LDAP::LDAP_SCOPE_BASE,
                           "(objectclass=*)") do |e|
           #puts "#{$$} #{e.dn.inspect}"
         end

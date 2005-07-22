@@ -42,7 +42,7 @@ class Server
 
   # create opt[:ssl_ctx] from the other ssl options
 
-  def self.ssl_prepare(opt)
+  def self.ssl_prepare(opt) # :nodoc:
     if opt[:ssl_key_file] and opt[:ssl_cert_file]
       ctx = OpenSSL::SSL::SSLContext.new
       ctx.key = OpenSSL::PKey::RSA.new(File::read(opt[:ssl_key_file]))

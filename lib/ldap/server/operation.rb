@@ -22,6 +22,11 @@ class Server
   # and the sending of responses.
 
   class Operation
+
+    # An instance of this object is created by the Connection object
+    # for each operation which is requested by the client. If you subclass
+    # Operation, and you override initialize, make sure you call 'super'.
+
     def initialize(connection, messageID)
       @connection = connection
       @respEnvelope = OpenSSL::ASN1::Sequence([
@@ -33,9 +38,13 @@ class Server
       @server = @connection.opt[:server]
     end
 
+    # Send a log message
+
     def log(*args)
       @connection.log(*args)
     end
+
+    # Send an exception report to the log
 
     def log_exception(e)
       @connection.log "#{e}: #{e.backtrace.join("\n\tfrom ")}"
@@ -45,7 +54,7 @@ class Server
     ### Utility methods to send protocol responses ###
     ##################################################
 
-    def send_LDAPMessage(protocolOp, opt={})
+    def send_LDAPMessage(protocolOp, opt={}) # :nodoc:
       @respEnvelope.value[1] = protocolOp
       if opt[:controls]
         @respEnvelope.value[2] = OpenSSL::ASN1::Set(opt[:controls], 0, :IMPLICIT, APPLICATION)
@@ -62,7 +71,7 @@ class Server
       @connection.write(@respEnvelope.to_der)
     end
 
-    def send_LDAPResult(tag, resultCode, opt={})
+    def send_LDAPResult(tag, resultCode, opt={}) # :nodoc:
       seq = [
         OpenSSL::ASN1::Enumerated(resultCode),
         OpenSSL::ASN1::OctetString(opt[:matchedDN] || ""),
@@ -179,7 +188,7 @@ class Server
     ### Methods to parse each request type ###
     ##########################################
 
-    def do_bind(protocolOp, controls)
+    def do_bind(protocolOp, controls) # :nodoc:
       version = protocolOp.value[0].value
       dn = protocolOp.value[1].value
       dn = nil if dn == ""
@@ -211,7 +220,7 @@ class Server
     #            type    AttributeDescription,
     #            vals    SET OF AttributeValue }
 
-    def attributelist(set)
+    def attributelist(set) # :nodoc:
       av = {}
       set.value.each do |seq|
         a = seq.value[0].value
@@ -227,7 +236,7 @@ class Server
       return av
     end
 
-    def do_search(protocolOp, controls)
+    def do_search(protocolOp, controls) # :nodoc:
       baseObject = protocolOp.value[0].value
       scope = protocolOp.value[1].value
       deref = protocolOp.value[2].value
@@ -280,7 +289,7 @@ class Server
       send_SearchResultDone(LDAP::ResultError::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
-    def do_modify(protocolOp, controls)
+    def do_modify(protocolOp, controls) # :nodoc:
       dn = protocolOp.value[0].value
       modinfo = {}
       protocolOp.value[1].value.each do |seq|
@@ -313,7 +322,7 @@ class Server
       send_ModifyResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
-    def do_add(protocolOp, controls)
+    def do_add(protocolOp, controls) # :nodoc:
       dn = protocolOp.value[0].value
       av = attributelist(protocolOp.value[1])
       add(dn, av)
@@ -328,7 +337,7 @@ class Server
       send_AddResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
-    def do_del(protocolOp, controls)
+    def do_del(protocolOp, controls) # :nodoc:
       dn = protocolOp.value
       del(dn)
       send_DelResponse(0)
@@ -342,7 +351,7 @@ class Server
       send_DelResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
-    def do_modifydn(protocolOp, controls)
+    def do_modifydn(protocolOp, controls) # :nodoc:
       entry = protocolOp.value[0].value
       newrdn = protocolOp.value[1].value
       deleteoldrdn = protocolOp.value[2].value
@@ -361,7 +370,7 @@ class Server
       send_ModifyDNResponse(LDAP::ResultCode::OperationsError.new.to_i, :errorMessage=>e.message)
     end
 
-    def do_compare(protocolOp, controls)
+    def do_compare(protocolOp, controls) # :nodoc:
       entry = protocolOp.value[0].value
       ava = protocolOp.value[1].value
       attr = ava[0].value
@@ -435,8 +444,9 @@ class Server
     #
     # dn is the object to modify; modification is a hash of
     #   attr => [:add, val, val...]       -- add operation
-    #   attr => [val, val...]             -- replace operation
-    #   attr => []                        -- delete operation
+    #   attr => [:replace, val, val...]   -- replace operation
+    #   attr => [:delete, val, val...]    -- delete these values
+    #   attr => [:delete]                 -- delete all values
 
     def modify(dn, modification)
       raise LDAP::ResultError::UnwillingToPerform, "modify not implemented"
@@ -444,7 +454,8 @@ class Server
 
     # Handle an add request; override this
     #
-    # Parameters are the dn of the entry to add, and a hash of {attr=>[val,..]}.
+    # Parameters are the dn of the entry to add, and a hash of
+    #   attr=>[val...]
     # Raise an exception if there is a problem; it is up to you to check
     # that the connection has sufficient authorisation using @connection.binddn
 

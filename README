@@ -1,3 +1,50 @@
+CHANGES FROM VERSION 0.2 TO VERSION 0.3
+---------------------------------------
+
+There have been substantial changes to ruby-ldapserver between version 0.2
+and version 0.3. If you have not been using 0.2, you can skip this section.
+
+Major API changes:
+
+* I have renamed module LDAPServer to module LDAP::Server, This means e.g.
+require 'ldapserver/connection' becomes require 'ldap/server/connection'
+
+* I have moved the result exceptions to be subclasses of LDAP::ResultError,
+for consistency with ruby-ldap, and named under LDAP::ResultError::<name> to
+group them together. Everything else remains under LDAP::Server.
+
+* The format of the parsed 'filter' parameter to Operation#search has
+changed. See filter.rb. In particular, the format of a :substrings filter
+has been changed (simplified).
+
+* The format of the 'modinfo' parameter to Operation#modify has changed. See
+the comment above 'def modify' in operation.rb
+
+* Attribute names are no longer automatically downcased. If you are running
+with a schema, however, then they will be converted into their preferred
+forms. That is, "OBJECTCLASS" will become "objectClass", "CommonName" will
+become "cn", and so on.
+
+Improvements include:
+
+* There is now an explicit object representing a server instance:
+"LDAP::Server". This bundles together the root DSE, the schema (if used),
+the subclass of Operation which you wish to use, and various other
+parameters such as ssl certificate data. It has methods run_tcpserver and
+run_prefork, making it straightforward to start a server. Both support SSL
+on connect. You can do require 'ldap/server' to get all the essential
+libraries for a server.
+
+* LDAP::Server :user and :group settings let you drop privileges after
+binding to port 389.
+
+* Schema support. Can load schemas in OpenLDAP format, publish them via
+LDAP, validate add/modify operations, use them to map attribute names to
+their 'standard' versions (e.g. "commonname" becomes "cn"), and perform
+case-insensitive comparisons where the schema mandates this. See classes
+LDAP::Server::Schema, LDAP::Server::ObjectClass, LDAP::Server::AttributeType,
+LDAP::Server::Syntax, LDAP::Server::MatchingRule, and examples/rbslapd3.rb.
+
 What is it?
 -----------
 
@@ -11,7 +58,9 @@ The Connection class handles incoming connections, decodes ASN1-formatted
 LDAP requests, and creates an Operation object for each request. The
 Operation object further parses the ASN1 request and invokes methods which
 you override to perform useful work. Responses and exceptions are converted
-back into ASN1 and returned to the client.
+back into ASN1 and returned to the client. Optionally, a collection of
+objects can be used to implement a Schema (e.g. normalize attribute names,
+validate add and modify operations, perform appropriate matching operations)
 
 Since it's written entirely in Ruby, it benefits from Ruby's threading
 engine.
@@ -28,7 +77,8 @@ use as a starting point.
 Status
 ------
 
-This is an initial alpha release for testing and feedback.
+This is an early release. It works for me as an LDAP protocol convertor; the
+Schema stuff has not been heavily tested by me.
 
 Libraries
 ---------
@@ -54,12 +104,12 @@ Protocol implementation
 
 ruby-ldapserver tries to be a reasonably complete implementation of the
 message decoding and encoding components of LDAP. However, it does not
-synthesise or enforce the LDAP data model. For example, if you want to
-publish LDAP entries to advertise your servers' capabilities in the root DSE
-(as required by RFC 2251 section 3.4) this is your own responsibility. If
-you don't then you won't be LDAP v3 compliant, but then again if you're just
-using LDAP as a convenient query interface into some other database, you
-probably don't care.
+synthesise or directly enforce the LDAP data model. It will advertise a
+schema in the root DSE if you configure one, and it provides helper
+functions which allow you to validate add and modify operations against a
+schema; but it's up to you to use them, if you wish. If you're just using
+LDAP as a convenient query interface into some other database, you probably
+don't care about schemas.
 
 If your clients permit it, you can violate the LDAP specification further,
 eliminating some of the gross design flaws of LDAP. For example, you can
@@ -91,10 +141,9 @@ multi-CPU system, all LDAP server operations will be processed on one CPU;
 also with a very large number of concurrent client connections, you may find
 you hit the a max-filedescriptors-per-process limit.
 
-However, you don't have to use tcpserver. You can instead write your own
-forking server, or use a preforking server library; see examples/rbslapd3.rb
-In this case, your connections are handled in separate processes so they
-cannot share data directly in RAM.
+I have also provided a preforking server; see examples/rbslapd3.rb. In this
+case, your connections are handled in separate processes so they cannot
+share data directly in RAM.
 
 If you are using the default threading tcpserver, then beware that a number
 of Ruby extension libraries block the threading interpreter. In particular,
@@ -141,12 +190,9 @@ with N=1,M=1000 and 300-400 searches per second with N=10,M=100.
 To-do list
 ----------
 
-- schema support:
-  - publish root DSE and subschemaSubentry
-  - handle case-insensitive attribute matching
-  - map attribute aliases to standard name
 - handle and test generation of LDAP referrals properly
-- test suite: abandon, concurrency, performance tests, error handling
+- more cases in test suite: abandon, concurrency, performance tests, error
+  handling
 - extensible match filters
 - extended operations
   RFC 2830 - Start TLS
