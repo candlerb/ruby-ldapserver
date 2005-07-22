@@ -395,8 +395,10 @@ EOS
       when 'attributeTypes'
         return all_attrtypes.collect { |e| e.name }
       when 'ldapSyntaxes'
-        return LDAP::ResultError::Syntax.all_syntaxes.collect { |e| e.name }
-      # TODO: matchingRules, matchingRuleUse
+        return LDAP::Server::Syntax.all_syntaxes.collect { |e| e.name }
+      when 'matchingRules'
+        return LDAP::Server::MatchingRule.all_matching_rules.collect { |e| e.name }
+      # TODO: matchingRuleUse
       end
       return nil
     end
