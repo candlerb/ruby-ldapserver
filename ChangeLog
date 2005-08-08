@@ -1,3 +1,5 @@
+RELEASE_0_3
+
 Filters now return nil instead of LDAP::Server::MatchingRule::DefaultMatch
 in the case that there's no schema.
 Minor changes to syntax.rb to support OpenLDAP extensions.
