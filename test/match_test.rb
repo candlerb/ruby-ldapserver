@@ -1,6 +1,5 @@
-$:.unshift('../lib').uniq!
+require File.dirname(__FILE__) + '/test_helper'
 require 'ldap/server/match'
-require 'test/unit'
 
 class MatchTest < Test::Unit::TestCase
 

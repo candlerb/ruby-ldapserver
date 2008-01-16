@@ -1,7 +1,4 @@
-#!/usr/local/bin/ruby -w
-
-$:.unshift('../lib').uniq!
-require 'test/unit'
+require File.dirname(__FILE__) + '/test_helper'
 require 'ldap/server/filter'
 
 class FilterTest < Test::Unit::TestCase

@@ -1,4 +1,4 @@
-#!/usr/local/bin/ruby -w
+require File.dirname(__FILE__) + '/test_helper'
 
 Thread.abort_on_exception = true
 
@@ -9,12 +9,9 @@ Thread.abort_on_exception = true
 # LDAP requests, which is nasty. However, it does give us a completely
 # independent source of LDAP packets to try.
 
-$:.unshift('../lib').uniq!
-
 require 'ldap/server/operation'
 require 'ldap/server/server'
 
-require 'test/unit'
 require 'ldap'
 
 # We subclass the Operation class, overriding the methods to do what we need
@@ -62,7 +59,6 @@ class MockOperation < LDAP::Server::Operation
 end
 
 class TestLdap < Test::Unit::TestCase
-
   HOST = '127.0.0.1'
   PORT = 1389
 
@@ -77,10 +73,10 @@ class TestLdap < Test::Unit::TestCase
     # back to a single process (the parent). Now we start our
     # listener thread
     @serv = LDAP::Server.new(
-	:bindaddr		=> "127.0.0.1",
-	:port			=> 1389,
-	:nodelay		=> true,
-	:operation_class	=> MockOperation
+    	:bindaddr		=> '127.0.0.1',
+    	:port			=> PORT,
+    	:nodelay		=> true,
+    	:operation_class	=> MockOperation
     )
     @serv.run_tcpserver
   end

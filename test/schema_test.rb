@@ -1,7 +1,6 @@
-$:.unshift('../lib').uniq!
+require File.dirname(__FILE__) + '/test_helper'
 require 'ldap/server/schema'
 require 'ldap/server/match'
-require 'test/unit'
 
 class SchemaTest < Test::Unit::TestCase
 
@@ -76,7 +75,7 @@ OC
   def test_loadschema
     s = LDAP::Server::Schema.new
     s.load_system
-    s.load_file("core.schema")
+    s.load_file(File.dirname(__FILE__) + "/core.schema")
     s.resolve_oids
     a = s.find_attrtype("objectclass")
     assert_equal("objectClass", a.name)

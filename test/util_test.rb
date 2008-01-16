@@ -1,9 +1,5 @@
-#!/usr/local/bin/ruby -w
-
-$:.unshift('../lib').uniq!
-
+require File.dirname(__FILE__) + '/test_helper'
 require 'ldap/server/util'
-require 'test/unit'
 
 class TestLdapUtil < Test::Unit::TestCase
   def test_split_dn
