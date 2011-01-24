@@ -47,6 +47,13 @@ class Server
       ctx = OpenSSL::SSL::SSLContext.new
       ctx.key = OpenSSL::PKey::RSA.new(File::read(opt[:ssl_key_file]))
       ctx.cert = OpenSSL::X509::Certificate.new(File::read(opt[:ssl_cert_file]))
+      if opt[:ssl_dhparams]
+        ctx.tmp_dh_callback = proc { |*args|
+            OpenSSL::PKey::DH.new(
+              File.read(opt[:ssl_dhparams])
+            )
+        }
+      end
       if opt[:ssl_ca_path]
         ctx.ca_path = opt[:ssl_ca_path]
         ctx.verify_mode = 
