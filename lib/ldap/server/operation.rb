@@ -298,7 +298,7 @@ class Server
           attr = @schema.find_attrtype(attr).to_s
         end
         vals = seq.value[1].value[1].value.collect { |v| v.value }
-        case seq.value[0].value
+        case seq.value[0].value.to_i
         when 0
           modinfo[attr] = [:add] + vals
         when 1
