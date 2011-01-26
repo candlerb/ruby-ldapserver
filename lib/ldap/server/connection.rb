@@ -19,7 +19,7 @@ class Server
       @io = io
       @opt = opt
       @mutex = Mutex.new
-      @active_reqs = {}   # map message ID to thread object
+      @threadgroup = ThreadGroup.new
       @binddn = nil
       @version = 3
       @logger = @opt[:logger] || $stderr
@@ -34,7 +34,7 @@ class Server
 
     def startssl # :yields:
       @mutex.synchronize do
-        raise LDAP::ResultError::OperationsError if @ssl or @active_reqs.size > 0
+        raise LDAP::ResultError::OperationsError if @ssl or @threadgroup.list.size > 0
         yield if block_given?
         @io = OpenSSL::SSL::SSLSocket.new(@io, @opt[:ssl_ctx])
         @io.sync_close = true
@@ -119,78 +119,22 @@ class Server
               throw(:close)
 
             when 3 # SearchRequest
-              # Note: RFC 2251 4.4.4.1 says behaviour is undefined if
-              # client sends an overlapping request with same message ID,
-              # so we don't have to worry about the case where there is
-              # already a thread with this id in @active_reqs.
-              # However, to avoid a race we copy messageId/
-              # protocolOp/controls into thread-local variables, because
-              # they will change when the next request comes in.
-              #
-              # There is a theoretical race condition here: a client could
-              # send an abandon request before Thread.current is assigned to
-              # @active_reqs[thrm]. It's not a problem, because abandon isn't
-              # guaranteed to work anyway. Doing it this way ensures that
-              # @active_reqs does not leak memory on a long-lived connection.
-
-              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                begin
-                  @active_reqs[thrm] = Thread.current
-                  operationClass.new(self,thrm,*ocArgs).do_search(thrp, thrc)
-                ensure
-                  @active_reqs.delete(thrm)
-                end
-              end
+              start_op(messageId,protocolOp,controls,:do_search)
 
             when 6 # ModifyRequest
-              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                begin
-                  @active_reqs[thrm] = Thread.current
-                  operationClass.new(self,thrm,*ocArgs).do_modify(thrp, thrc)
-                ensure
-                  @active_reqs.delete(thrm)
-                end
-              end
+              start_op(messageId,protocolOp,controls,:do_modify)
 
             when 8 # AddRequest
-              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                begin
-                  @active_reqs[thrm] = Thread.current
-                  operationClass.new(self,thrm,*ocArgs).do_add(thrp, thrc)
-                ensure
-                  @active_reqs.delete(thrm)
-                end
-              end
+              start_op(messageId,protocolOp,controls,:do_add)
 
             when 10 # DelRequest
-              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                begin
-                  @active_reqs[thrm] = Thread.current
-                  operationClass.new(self,thrm,*ocArgs).do_del(thrp, thrc)
-                ensure
-                  @active_reqs.delete(thrm)
-                end
-              end
+              start_op(messageId,protocolOp,controls,:do_del)
 
             when 12 # ModifyDNRequest
-              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                begin
-                  @active_reqs[thrm] = Thread.current
-                  operationClass.new(self,thrm,*ocArgs).do_modifydn(thrp, thrc)
-                ensure
-                  @active_reqs.delete(thrm)
-                end
-              end
+              start_op(messageId,protocolOp,controls,:do_modifydn)
 
             when 14 # CompareRequest
-              Thread.new(messageId,protocolOp,controls) do |thrm,thrp,thrc|
-                begin
-                  @active_reqs[thrm] = Thread.current
-                  operationClass.new(self,thrm,*ocArgs).do_compare(thrp, thrc)
-                ensure
-                  @active_reqs.delete(thrm)
-                end
-              end
+              start_op(messageId,protocolOp,controls,:do_compare)
 
             when 16 # AbandonRequest
               abandon(protocolOp.value)
@@ -210,6 +154,27 @@ class Server
       abandon_all
     end
 
+    # Start an operation in a Thread. Add this to a ThreadGroup to allow
+    # the operation to be abandoned later.
+    #
+    # When the thread terminates, it automatically drops out of the group.
+    #
+    # Note: RFC 2251 4.4.4.1 says behaviour is undefined if
+    # client sends an overlapping request with same message ID,
+    # so we don't have to worry about the case where there is
+    # already a thread with this messageId in @threadgroup.
+
+    def start_op(messageId,protocolOp,controls,meth)
+      operationClass = @opt[:operation_class]
+      ocArgs = @opt[:operation_args] || []
+      thr = Thread.new {
+        operationClass.new(self,messageId,*ocArgs).
+        send(meth,protocolOp,controls)
+      }
+      thr[:messageId] = messageId
+      @threadgroup.add(thr)
+    end
+
     def write(data)
       @mutex.synchronize do
         @io.write(data)
@@ -226,18 +191,16 @@ class Server
 
     def abandon(messageID)
       @mutex.synchronize do
-        thread = @active_reqs.delete(messageID)
-        thread.raise LDAP::Abandon if thread and thread.alive?
+        thread = @threadgroup.list.find { |t| t[:messageId] == messageID }
+        thread.raise LDAP::Abandon if thread
       end
     end
 
     def abandon_all
-      return if @active_reqs.size == 0
       @mutex.synchronize do
-        @active_reqs.each do |id, thread|
-          thread.raise LDAP::Abandon if thread.alive?
+        @threadgroup.list.each do |thread|
+          thread.raise LDAP::Abandon
         end
-        @active_reqs = {}
       end
     end
 
