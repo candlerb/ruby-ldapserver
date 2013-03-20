@@ -436,7 +436,7 @@ class Server
     # care of, but you need to perform all authorisation checks yourself,
     # using @connection.binddn
 
-    def search(basedn, scope, deref, filter, attrs)
+    def search(basedn, scope, deref, filter)
       raise LDAP::ResultError::UnwillingToPerform, "search not implemented"
     end
 
