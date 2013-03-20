@@ -1,6 +1,7 @@
 require 'ldap/server/connection'
 require 'ldap/server/operation'
 require 'openssl'
+require 'logger'
 
 module LDAP
 class Server
@@ -20,12 +21,19 @@ class Server
   #   :ssl_ca_path=>directory			- verify peer certificates
   #   :schema=>Schema				- Schema object
   #   :namingContexts=>[dn, ...]		- base DN(s) we answer
+  
+  attr_reader :logger
 
   def initialize(opt = DEFAULT_OPT)
     @opt = opt
     @opt[:server] = self
     @opt[:operation_class] ||= LDAP::Server::Operation
     @opt[:operation_args] ||= []
+    unless @opt[:logger]
+       @opt[:logger] ||= Logger.new($stderr)
+       @opt[:logger].level = Logger::INFO
+    end
+    @logger = @opt[:logger]
     LDAP::Server.ssl_prepare(@opt)
     @schema = opt[:schema]	# may be nil
     @root_dse = Hash.new { |h,k| h[k] = [] }.merge({

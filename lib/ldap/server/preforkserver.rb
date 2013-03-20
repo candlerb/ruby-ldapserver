@@ -22,7 +22,6 @@ class Server
   #   :max_idle=>N				- seconds
 
   def self.preforkserver(opt, &blk)
-    logger = opt[:logger] || $stderr
     server = PreFork.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
 
     # Drop privileges if requested
@@ -60,7 +59,7 @@ class Server
           # This exception can be raised to shut the server down
           server.stop
         rescue Exception => e
-          logger << "[#{s.peeraddr[3]}]: #{e}: #{e.backtrace[0]}\n"
+          opt[:logger].error(s.peeraddr[3]) { "#{e}: #{e.backtrace[0]}" }
         ensure
           s.close
         end

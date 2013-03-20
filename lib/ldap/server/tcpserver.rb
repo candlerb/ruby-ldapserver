@@ -22,7 +22,6 @@ class Server
   #   :nodelay=>true				- set TCP_NODELAY option
 
   def self.tcpserver(opt, &blk)
-    logger = opt[:logger] || $stderr
     server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
 
     # Drop privileges if requested
@@ -51,8 +50,7 @@ class Server
             begin
               s.instance_eval(&blk)
             rescue Exception => e
-              logger << "[#{s.peeraddr[3]}]: #{e}: #{e.backtrace[0]}\n"
-              #logger << "[#{s.peeraddr[3]}]: #{e}: #{e.backtrace.join("\n\tfrom ")}\n"
+              opt[:logger].error(s.peeraddr[3]) {"#{e}: #{e.backtrace[0]}"}
             ensure
               s.close
             end

@@ -22,14 +22,22 @@ class Server
       @threadgroup = ThreadGroup.new
       @binddn = nil
       @version = 3
-      @logger = @opt[:logger] || $stderr
+      @logger = @opt[:logger]
       @ssl = false
 
       startssl if @opt[:ssl_on_connect]
     end
 
-    def log(msg)
-      @logger << "[#{@io.peeraddr[3]}]: #{msg}\n"
+    def log(msg, severity = Logger::INFO)
+      @logger.add(severity, msg, @io.peeraddr[3])
+    end
+    
+    def debug msg
+      log msg, Logger::DEBUG
+    end
+    
+    def log_exception(e)
+      log "#{e}: #{e.backtrace.join("\n\tfrom ")}", Logger::ERROR
     end
 
     def startssl # :yields:
@@ -167,10 +175,14 @@ class Server
     def start_op(messageId,protocolOp,controls,meth)
       operationClass = @opt[:operation_class]
       ocArgs = @opt[:operation_args] || []
-      thr = Thread.new {
-        operationClass.new(self,messageId,*ocArgs).
-        send(meth,protocolOp,controls)
-      }
+      thr = Thread.new do
+        begin
+          operationClass.new(self,messageId,*ocArgs).
+          send(meth,protocolOp,controls)
+        rescue Exception => e
+          log_exception e
+        end
+      end
       thr[:messageId] = messageId
       @threadgroup.add(thr)
     end

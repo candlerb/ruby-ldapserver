@@ -38,16 +38,14 @@ class Server
       @server = @connection.opt[:server]
     end
 
-    # Send a log message
-
-    def log(*args)
-      @connection.log(*args)
-    end
-
     # Send an exception report to the log
 
-    def log_exception(e)
-      @connection.log "#{e}: #{e.backtrace.join("\n\tfrom ")}"
+    def debug msg
+      @connection.debug msg
+    end
+    
+    def log_exception
+      @connection.log_exception msg
     end
 
     ##################################################
@@ -437,6 +435,7 @@ class Server
     # using @connection.binddn
 
     def search(basedn, scope, deref, filter)
+      debug "search(#{basedn}, #{scope}, #{deref}, #{filter})"
       raise LDAP::ResultError::UnwillingToPerform, "search not implemented"
     end
 
