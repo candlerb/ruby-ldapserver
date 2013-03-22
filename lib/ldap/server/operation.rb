@@ -44,7 +44,7 @@ class Server
       @connection.debug msg
     end
     
-    def log_exception
+    def log_exception msg
       @connection.log_exception msg
     end
 
