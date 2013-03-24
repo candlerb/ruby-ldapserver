@@ -38,11 +38,15 @@ class Server
       @server = @connection.opt[:server]
     end
 
-    # Send an exception report to the log
+    def log msg, severity = Logger::INFO
+      @connection.log msg, severity
+    end
 
     def debug msg
       @connection.debug msg
     end
+    
+    # Send an exception report to the log
     
     def log_exception msg
       @connection.log_exception msg
