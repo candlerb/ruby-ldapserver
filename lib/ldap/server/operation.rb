@@ -108,7 +108,7 @@ class Server
 
       if @schema
         # normalize the attribute names
-        @attributes = @attributes.collect { |a| @schema.find_attrtype(a).to_s }
+        @attributes = @attributes.map { |a| a == '*' ? a : @schema.find_attrtype(a).to_s }
       end
 
       sendall = @attributes == [] || @attributes.include?("*")

@@ -20,4 +20,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'bundler', '~> 1.3'
   s.add_development_dependency 'rake', '~> 10.0'
   s.add_development_dependency 'ruby-ldap', '~> 0.9.16'
+  s.add_development_dependency 'rspec', '~> 3.1'
 end
