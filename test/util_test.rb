@@ -25,7 +25,7 @@ class TestLdapUtil < Test::Unit::TestCase
 
     # Just for fun, let's try parsing it as UTF8
     chars = res[0]["sn"].force_encoding('utf-8').scan(/./u)
-    assert_equal(["L", "u", "\xc4\x8d", "i", "\xc4\x87"], chars)
+    assert_equal(["L", "u", "\u010d", "i", "\u0107"], chars)
   end
 
   def test_join_dn
