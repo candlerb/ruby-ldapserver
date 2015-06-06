@@ -243,7 +243,7 @@ class Server
       scope = protocolOp.value[1].value
       deref = protocolOp.value[2].value
       client_sizelimit = protocolOp.value[3].value
-      client_timelimit = protocolOp.value[4].value
+      client_timelimit = protocolOp.value[4].value.to_i
       @typesOnly = protocolOp.value[5].value
       filter = Filter::parse(protocolOp.value[6], @schema)
       @attributes = protocolOp.value[7].value.collect {|x| x.value}
