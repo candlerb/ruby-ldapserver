@@ -1,3 +1,6 @@
+0.5.2
+* Make sure the exception used to stop the child doesn't propagate up (patch by Kasumi Hanazuki)
+
 0.3.1 - 2008-01-16
 * First release as a gem [Brandon Keepers]
 
