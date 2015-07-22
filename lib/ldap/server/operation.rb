@@ -267,7 +267,7 @@ class Server
       end
 
       t = server_timelimit || 10
-      t = client_timelimit if client_timelimit > 0 and client_timelimit < t
+      t = Integer(client_timelimit) if client_timelimit > 0 and client_timelimit < t
 
       Timeout::timeout(t, LDAP::ResultError::TimeLimitExceeded) do
         search(baseObject, scope, deref, filter)
