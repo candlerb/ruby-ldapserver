@@ -145,7 +145,9 @@ class Server
               start_op(messageId,protocolOp,controls,:do_compare)
 
             when 16 # AbandonRequest
-              abandon(protocolOp.value)
+              otherId = protocolOp.value
+              otherId = otherId.unpack("H*")[0].to_i(16) if otherId.kind_of? String
+              abandon(otherId)
 
             else
               raise LDAP::ResultError::ProtocolError, "Unrecognised protocolOp tag #{protocolOp.tag}"
