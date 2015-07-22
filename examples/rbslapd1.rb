@@ -74,6 +74,11 @@ class HashOperation < LDAP::Server::Operation
       entry.delete(attr) if entry[attr] == []
     end
   end
+
+  #def simple_bind(version, dn, password)
+  #  return if dn == "cn=admin" and password == "xyzzy"
+  #  raise LDAP::ResultError::InvalidCredentials, "Bad DN or password"
+  #end
 end
 
 # This is the shared object which carries our actual directory entries.
