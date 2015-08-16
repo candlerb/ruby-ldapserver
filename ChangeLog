@@ -1,3 +1,8 @@
+0.5.3
+* Handle BN as client_timelimit; fixes incompatibility with some LDAP
+implementations (notably Shibboleth IdP v2 and proftpd).
+(Patch by Pete Birkinshaw.)
+
 0.5.2
 * Make sure the exception used to stop the child doesn't propagate up (patch by Kasumi Hanazuki)
 
