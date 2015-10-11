@@ -56,7 +56,7 @@ class Server
 
     # Whether or not the DN starts with dn (bottom-up)
     # dn is a string
-    def starts_with?(dn)
+    def start_with?(dn)
       needle = LDAP::Server::Operation.split_dn(dn)
 
       # Needle is longer than haystack
@@ -75,7 +75,7 @@ class Server
 
     # Whether or not the DN ends with dn (top-down)
     # dn is a string
-    def ends_with?(dn)
+    def end_with?(dn)
       needle = LDAP::Server::Operation.split_dn(dn)
 
       # Needle is longer than haystack
@@ -94,7 +94,7 @@ class Server
 
     # Whether or not the DN equals dn (values are case sensitive)
     # dn is a string
-    def equals?(dn)
+    def equal?(dn)
       split_dn = LDAP::Server::Operation.split_dn(dn)
 
       return false if split_dn.length != @dname.length
@@ -107,7 +107,7 @@ class Server
 
     # Whether or not the DN equals dn's format (values are ignored) (case insensitive)
     # dn is a string
-    def equals_format?(dn)
+    def equal_format?(dn)
       split_dn = LDAP::Server::Operation.split_dn(dn)
 
       return false if split_dn.length != @dname.length
@@ -117,6 +117,31 @@ class Server
       end
       true
     end
+
+    # Whether or not the DN constains a substring equal to dn (values are case sensitive)
+    # dn is a string
+    def include?(dn)
+      split_dn = LDAP::Server::Operation.split_dn(dn)
+      return false if split_dn.length > @dname.length
+      LDAP::Server::Operation.join_dn(@dname).include?(LDAP::Server::Operation.join_dn(split_dn))
+    end
+
+    # Whether or not the DN constains a substring format equal to dn (values are ignored) (case insensitive)
+    # dn is a string
+    def include_format?(dn)
+      split_dn = LDAP::Server::Operation.split_dn(dn)
+
+      return false if split_dn.length > @dname.length
+
+      haystack = []
+      @dname.each { |pair| haystack << pair.keys }
+
+      needle = []
+      split_dn.each { |pair| needle << pair.keys }
+
+      haystack.join.include?(needle.join)
+    end
+
   end
 
 end

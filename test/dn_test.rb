@@ -2,100 +2,126 @@ require File.dirname(__FILE__) + '/test_helper'
 require 'ldap/server/dn'
 
 class TestLdapDn < Test::Unit::TestCase
+  def setup
+    @dn = LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB")
+  end
+
   def test_find_first
     assert_equal(
       nil,
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_first("ou")
+      @dn.find_first("ou")
     )
     assert_equal(
       "Steve Kille",
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_first("cn")
+      @dn.find_first("cn")
     )
     assert_equal(
       "Isode Limited",
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_first("o")
+      @dn.find_first("o")
     )
   end
 
   def test_find_last
     assert_equal(
       nil,
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_last("ou")
+      @dn.find_last("ou")
     )
     assert_equal(
       "Steve Kille",
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_last("cn")
+      @dn.find_last("cn")
     )
     assert_equal(
       "Companies",
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_last("o")
+      @dn.find_last("o")
     )
   end
 
   def test_find
     assert_equal(
       [],
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find("ou")
+      @dn.find("ou")
     )
     assert_equal(
       ["Steve Kille"],
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find("cn")
+      @dn.find("cn")
     )
     assert_equal(
       ["Isode Limited", "Companies"],
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find("o")
+      @dn.find("o")
     )
   end
 
   def test_find_nth
     assert_equal(
       nil,
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_nth("ou", 0)
+      @dn.find_nth("ou", 0)
     )
     assert_equal(
       "Steve Kille",
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_nth("cn", 0)
+      @dn.find_nth("cn", 0)
     )
     assert_equal(
       nil,
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_nth("cn", 1)
+      @dn.find_nth("cn", 1)
     )
     assert_equal(
       "Isode Limited",
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_nth("o", 0)
+      @dn.find_nth("o", 0)
     )
     assert_equal(
       "Companies",
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_nth("o", 1)
+      @dn.find_nth("o", 1)
     )
     assert_equal(
       nil,
-      LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").find_nth("o", 2)
+      @dn.find_nth("o", 2)
     )
   end
 
-  def test_starts_with
-    assert LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").starts_with?("cn=Steve Kille")
-    assert LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").starts_with?("cn=Steve Kille, o=Isode Limited")
-    assert (not LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").starts_with?("cn=John Doe"))
+  def test_start_with
+    assert @dn.start_with?("cn=Steve Kille")
+    assert @dn.start_with?("cn=Steve Kille, o=Isode Limited")
+    assert (not @dn.start_with?("cn=John Doe"))
   end
 
-  def test_ends_with
-    assert LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").ends_with?("c=GB")
-    assert LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").ends_with?("o=Companies, c=GB")
-    assert (not LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").ends_with?("c=BE"))
+  def test_end_with
+    assert @dn.end_with?("c=GB")
+    assert @dn.end_with?("o=Companies, c=GB")
+    assert (not @dn.end_with?("c=BE"))
   end
 
-  def test_equals
-    assert LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").equals?("CN=Steve Kille,     o=Isode Limited,O=Companies,c=GB")
-    assert (not LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").equals?("cn=John Doe,o=Isode Limited,o=Companies,c=GB"))
+  def test_equal
+    assert @dn.equal?("CN=Steve Kille,     o=Isode Limited,O=Companies,c=GB")
+    assert (not @dn.equal?("cn=John Doe,o=Isode Limited,o=Companies,c=GB"))
   end
 
-  def test_equals_format
-    assert LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").equals_format?("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB")
-    assert LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").equals_format?("cn=STEVE KILLE,o=ISODE LIMITED,o=COMPANIES,c=GB")
-    assert LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").equals_format?("cn=foo,o=bar,o=baz,c=bat")
-    assert LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").equals_format?("CN=foo,O=bar,O=baz,C=bat")
-    assert (not LDAP::Server::DN.new("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB").equals_format?("cn=foo,o=Isode Limited,c=GB"))
+  def test_equal_format
+    assert @dn.equal_format?("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB")
+    assert @dn.equal_format?("cn=STEVE KILLE,o=ISODE LIMITED,o=COMPANIES,c=GB")
+    assert @dn.equal_format?("cn=foo,o=bar,o=baz,c=bat")
+    assert @dn.equal_format?("CN=foo,O=bar,O=baz,C=bat")
+    assert (not @dn.equal_format?("cn=foo,o=Isode Limited,c=GB"))
+  end
+
+  def test_include
+    assert @dn.include?("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB")
+    assert @dn.include?("cn=Steve Kille")
+    assert @dn.include?("o=Isode Limited")
+    assert @dn.include?("o=Isode Limited,o=Companies")
+    assert @dn.include?("c=GB")
+
+    assert (not @dn.include?("cn=John Doe,o=Isode Limited,o=Companies,c=GB"))
+    assert (not @dn.include?("cn=Steve Kille,o=Isode Limited,c=GB"))
+  end
+
+  def test_include_format
+    assert @dn.include_format?("cn=foo,o=bar,o=baz,c=bat")
+    assert @dn.include_format?("cn=foo")
+    assert @dn.include_format?("o=bar")
+    assert @dn.include_format?("o=bar,o=baz")
+    assert @dn.include_format?("c=bat")
+
+    assert (not @dn.include_format?("cn=foo,o=bar,c=bat"))
+    assert (not @dn.include_format?("cn=bar,c=bat"))
   end
 end
