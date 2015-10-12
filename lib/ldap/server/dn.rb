@@ -73,6 +73,25 @@ class Server
       true
     end
 
+    # Whether or not the DN starts with a format (bottom-up) (values are ignored)
+    # dn is a string
+    def start_with_format?(dn)
+      needle = LDAP::Server::Operation.split_dn(dn)
+
+      # Needle is longer than haystack
+      return false if needle.length > @dname.length
+
+      needle_index = 0
+      haystack_index = 0
+
+      while needle_index < needle.length
+        return false if @dname[haystack_index].keys != needle[needle_index].keys
+        needle_index += 1
+        haystack_index += 1
+      end
+      true
+    end
+
     # Whether or not the DN ends with dn (top-down)
     # dn is a string
     def end_with?(dn)
@@ -86,6 +105,25 @@ class Server
 
       while needle_index >= 0
         return false if @dname[haystack_index] != needle[needle_index]
+        needle_index -= 1
+        haystack_index -= 1
+      end
+      true
+    end
+
+    # Whether or not the DN ends with format (top-down) (values are ignored)
+    # dn is a string
+    def end_with_format?(dn)
+      needle = LDAP::Server::Operation.split_dn(dn)
+
+      # Needle is longer than haystack
+      return false if needle.length > @dname.length
+
+      needle_index = needle.length - 1
+      haystack_index = @dname.length - 1
+
+      while needle_index >= 0
+        return false if @dname[haystack_index].keys != needle[needle_index].keys
         needle_index -= 1
         haystack_index -= 1
       end

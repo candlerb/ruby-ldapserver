@@ -7,75 +7,30 @@ class TestLdapDn < Test::Unit::TestCase
   end
 
   def test_find_first
-    assert_equal(
-      nil,
-      @dn.find_first("ou")
-    )
-    assert_equal(
-      "Steve Kille",
-      @dn.find_first("cn")
-    )
-    assert_equal(
-      "Isode Limited",
-      @dn.find_first("o")
-    )
+    assert_equal(nil, @dn.find_first("ou"))
+    assert_equal("Steve Kille", @dn.find_first("cn"))
+    assert_equal("Isode Limited", @dn.find_first("o"))
   end
 
   def test_find_last
-    assert_equal(
-      nil,
-      @dn.find_last("ou")
-    )
-    assert_equal(
-      "Steve Kille",
-      @dn.find_last("cn")
-    )
-    assert_equal(
-      "Companies",
-      @dn.find_last("o")
-    )
+    assert_equal(nil, @dn.find_last("ou"))
+    assert_equal("Steve Kille", @dn.find_last("cn"))
+    assert_equal("Companies", @dn.find_last("o"))
   end
 
   def test_find
-    assert_equal(
-      [],
-      @dn.find("ou")
-    )
-    assert_equal(
-      ["Steve Kille"],
-      @dn.find("cn")
-    )
-    assert_equal(
-      ["Isode Limited", "Companies"],
-      @dn.find("o")
-    )
+    assert_equal([], @dn.find("ou"))
+    assert_equal(["Steve Kille"], @dn.find("cn"))
+    assert_equal(["Isode Limited", "Companies"], @dn.find("o"))
   end
 
   def test_find_nth
-    assert_equal(
-      nil,
-      @dn.find_nth("ou", 0)
-    )
-    assert_equal(
-      "Steve Kille",
-      @dn.find_nth("cn", 0)
-    )
-    assert_equal(
-      nil,
-      @dn.find_nth("cn", 1)
-    )
-    assert_equal(
-      "Isode Limited",
-      @dn.find_nth("o", 0)
-    )
-    assert_equal(
-      "Companies",
-      @dn.find_nth("o", 1)
-    )
-    assert_equal(
-      nil,
-      @dn.find_nth("o", 2)
-    )
+    assert_equal(nil, @dn.find_nth("ou", 0))
+    assert_equal("Steve Kille", @dn.find_nth("cn", 0))
+    assert_equal(nil, @dn.find_nth("cn", 1))
+    assert_equal("Isode Limited", @dn.find_nth("o", 0))
+    assert_equal("Companies", @dn.find_nth("o", 1))
+    assert_equal(nil, @dn.find_nth("o", 2))
   end
 
   def test_start_with
@@ -84,10 +39,24 @@ class TestLdapDn < Test::Unit::TestCase
     assert (not @dn.start_with?("cn=John Doe"))
   end
 
+  def test_start_with_format
+    assert @dn.start_with_format?("cn=Steve Kille")
+    assert @dn.start_with_format?("cn=foo, o=bar")
+    assert (not @dn.start_with_format?("c=GB"))
+    assert (not @dn.start_with_format?("c=BE"))
+  end
+
   def test_end_with
     assert @dn.end_with?("c=GB")
     assert @dn.end_with?("o=Companies, c=GB")
     assert (not @dn.end_with?("c=BE"))
+  end
+
+  def test_end_with_format
+    assert @dn.end_with_format?("c=GB")
+    assert @dn.end_with_format?("o=foo, c=bar")
+    assert (not @dn.end_with_format?("cn=Steve Kille"))
+    assert (not @dn.end_with_format?("cn=foo"))
   end
 
   def test_equal
