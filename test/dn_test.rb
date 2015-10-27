@@ -93,4 +93,32 @@ class TestLdapDn < Test::Unit::TestCase
     assert (not @dn.include_format?("cn=foo,o=bar,c=bat"))
     assert (not @dn.include_format?("cn=bar,c=bat"))
   end
+
+  def test_each
+    answer = [
+      { 'cn' => 'Steve Kille' },
+      { 'o' => 'Isode Limited' },
+      { 'o' => 'Companies' },
+      { 'c' => 'GB' }
+    ]
+    i = 0
+    @dn.each do |pair|
+      assert pair == answer[i]
+      i += 1
+    end
+  end
+
+  def test_reverse_each
+    answer = [
+      { 'c' => 'GB' },
+      { 'o' => 'Companies' },
+      { 'o' => 'Isode Limited' },
+      { 'cn' => 'Steve Kille' }
+    ]
+    i = 0
+    @dn.reverse_each do |pair|
+      assert pair == answer[i]
+      i += 1
+    end
+  end
 end

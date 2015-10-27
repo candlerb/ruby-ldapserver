@@ -4,7 +4,9 @@ module LDAP
 class Server
 
   class DN
-    @dname
+    include Enumerable
+
+    attr_reader :dname
 
     # Combines a set of elements to a syntactically correct DN
     # elements is [elements, ...] where elements
@@ -178,6 +180,26 @@ class Server
       split_dn.each { |pair| needle << pair.keys }
 
       haystack.join.include?(needle.join)
+    end
+
+    def each(&block)
+      @dname.each do |pair|
+        if block_given?
+          block.call pair
+        else
+          yield pair
+        end
+      end
+    end
+
+    def reverse_each(&block)
+      @dname.reverse_each do |pair|
+        if block_given?
+          block.call pair
+        else
+          yield pair
+        end
+      end
     end
 
   end
