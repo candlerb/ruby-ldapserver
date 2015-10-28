@@ -94,6 +94,20 @@ class TestLdapDn < Test::Unit::TestCase
     assert (not @dn.include_format?("cn=bar,c=bat"))
   end
 
+  def test_parse
+    assert @dn.parse("cn=:cn,o=:company,o=Companies,c=:country") == {
+      :cn => 'Steve Kille',
+      :company => 'Isode Limited',
+      :country => 'GB'
+    }
+    assert @dn.parse("cn=:cn,o=:company,o=:company,c=:country") == {
+      :cn => 'Steve Kille',
+      :company => 'Companies',
+      :country => 'GB'
+    }
+    assert @dn.parse("cn=Steve Kille,o=Isode Limited,o=Companies,c=GB") == {}
+  end
+
   def test_each
     answer = [
       { 'cn' => 'Steve Kille' },

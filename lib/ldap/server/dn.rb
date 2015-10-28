@@ -182,6 +182,24 @@ class Server
       haystack.join.include?(needle.join)
     end
 
+    # Generates a mapping for variables
+    # For example:
+    # > dn = LDAP::Server.DN.new("uid=user,ou=Users,dc=mydomain,dc=com")
+    # > dn.parse("uid=:uid, ou=:category, dc=mydomain, dc=com")
+    # => { :uid => "user", :category => "Users" }
+    def parse(template_dn)
+      return false if not equal_format?(template_dn)
+
+      result = {}
+      template = LDAP::Server::Operation.split_dn(template_dn)
+      @dname.zip(template).each do |const, var|
+        if var.values.first.start_with?(':')
+          result[var.values.first[1..-1].to_sym] = const.values.first
+        end
+      end
+      result
+    end
+
     def each(&block)
       @dname.each do |pair|
         if block_given?
