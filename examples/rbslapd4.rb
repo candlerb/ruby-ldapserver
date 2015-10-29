@@ -31,6 +31,19 @@ class LDAPController
 
     $logger.debug "Authenticated user #{params[:uid]}"
   end
+
+  def self.search(request, baseObject, scope, deref, filter, params)
+    $logger.debug "Catchall search request"
+    raise LDAP::ResultError::UnwillingToPerform, "Invalid search DN"
+  end
+
+  def self.searchUser(request, baseObject, scope, deref, filter, params)
+    if params[:uid].nil?
+      raise LDAP::ResultError::UnwillingToPerform, "Invalid search DN"
+    end
+
+    $logger.debug "Search user #{params[:uid]}"
+  end
 end
 
 router = LDAP::Router.new($logger) do
@@ -41,6 +54,9 @@ router = LDAP::Router.new($logger) do
   # Bind a route using variables. A hash with the variables will be passed
   # to your function as last argument.
   bind    "uid=:uid,ou=Users,dc=mydomain,dc=com" => "LDAPController#bindUser"
+
+  search  nil => "LDAPController#search"
+  search  "uid=:uid,ou=Users,dc=mydomain,dc=com" => "LDAPController#searchUser"
 end
 
 

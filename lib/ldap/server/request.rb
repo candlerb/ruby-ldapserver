@@ -2,32 +2,22 @@ module LDAP
 class Router
 
   class Request
-    attr_accessor :connection
-
-    # Scope
-    BaseObject    = 0
-    SingleLevel   = 1
-    WholeSubtree  = 2
-
-    # DerefAliases
-    NeverDerefAliases   = 0
-    DerefInSearching    = 1
-    DerefFindingBaseObj = 2
-    DerefAlways         = 3
+    attr_accessor :connection, :typesOnly, :attributes, :rescount, :sizelimit
 
     # Object to handle a single LDAP request. This object is created on
     # every request by the router, and is passed as argument to the defined
     # routes.
 
-    def initialize(connection, messageID)
+    def initialize(connection, messageId)
       @connection = connection
       @respEnvelope = OpenSSL::ASN1::Sequence([
-        OpenSSL::ASN1::Integer(messageID),
+        OpenSSL::ASN1::Integer(messageId),
         # protocolOp,
         # controls [0] OPTIONAL,
       ])
       @schema = @connection.opt[:schema]
       @server = @connection.opt[:server]
+      @rescount = 0
     end
 
     ##################################################
@@ -149,24 +139,25 @@ class Router
         end
       end
     end
-  end
 
-  ############################################################
-  ### Methods to get parameters related to this connection ###
-  ############################################################
+    ############################################################
+    ### Methods to get parameters related to this connection ###
+    ############################################################
 
-  # Server-set maximum time limit. Override for more complex behaviour
-  # (e.g. limit depends on @connection.binddn). Nil uses hardcoded default.
+    # Server-set maximum time limit. Override for more complex behaviour
+    # (e.g. limit depends on @connection.binddn). Nil uses hardcoded default.
 
-  def server_timelimit
-    @connection.opt[:timelimit]
-  end
+    def server_timelimit
+      @connection.opt[:timelimit]
+    end
 
-  # Server-set maximum size limit. Override for more complex behaviour
-  # (e.g. limit depends on @connection.binddn). Return nil for unlimited.
+    # Server-set maximum size limit. Override for more complex behaviour
+    # (e.g. limit depends on @connection.binddn). Return nil for unlimited.
 
-  def server_sizelimit
-    @connection.opt[:sizelimit]
+    def server_sizelimit
+      @connection.opt[:sizelimit]
+    end
+
   end
 
 end

@@ -179,8 +179,12 @@ class Server
       ocArgs = @opt[:operation_args] || []
       thr = Thread.new do
         begin
-          operationClass.new(self,messageId,*ocArgs).
-          send(meth,protocolOp,controls)
+          if @opt[:router]
+            @opt[:router].send meth, self, messageId, protocolOp, controls
+          else
+            operationClass.new(self,messageId,*ocArgs).
+            send(meth,protocolOp,controls)
+          end
         rescue Exception => e
           log_exception e
         end
