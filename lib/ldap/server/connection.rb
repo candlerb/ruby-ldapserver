@@ -31,11 +31,11 @@ class Server
     def log(msg, severity = Logger::INFO)
       @logger.add(severity, msg, @io.peeraddr[3])
     end
-    
+
     def debug msg
       log msg, Logger::DEBUG
     end
-    
+
     def log_exception(e)
       log "#{e}: #{e.backtrace.join("\n\tfrom ")}", Logger::ERROR
     end
@@ -93,8 +93,6 @@ class Server
     end
 
     def handle_requests
-      operationClass = @opt[:operation_class]
-      ocArgs = @opt[:operation_args] || []
       catch(:close) do
         while true
           begin
@@ -120,9 +118,14 @@ class Server
             case protocolOp.tag
             when 0 # BindRequest
               abandon_all
-              @binddn, @version = operationClass.new(self,messageId,*ocArgs).
-                                  do_bind(protocolOp, controls)
-
+              if @opt[:router]
+                @binddn, @version = @opt[:router].do_bind(self, messageId, protocolOp, controls)
+              else
+                operationClass = @opt[:operation_class]
+                ocArgs = @opt[:operation_args] || []
+                @binddn, @version = operationClass.new(self,messageId,*ocArgs).
+                                    do_bind(protocolOp, controls)
+              end
             when 2 # UnbindRequest
               throw(:close)
 
@@ -171,7 +174,6 @@ class Server
     # client sends an overlapping request with same message ID,
     # so we don't have to worry about the case where there is
     # already a thread with this messageId in @threadgroup.
-
     def start_op(messageId,protocolOp,controls,meth)
       operationClass = @opt[:operation_class]
       ocArgs = @opt[:operation_args] || []
