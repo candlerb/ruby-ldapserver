@@ -25,6 +25,11 @@ class Trie
     @root.lookup split_dn
   end
 
+  def match(dn)
+    split_dn = LDAP::Server::DN.new(dn)
+    @root.match split_dn
+  end
+
   def print_tree
     @root.print_tree
   end
@@ -32,9 +37,7 @@ class Trie
 end
 
 class Node
-  @parent
-  @value
-  @children
+  attr_accessor :parent, :value, :children
 
   def initialize(parent = nil, value = nil)
     @parent = parent
@@ -43,8 +46,7 @@ class Node
   end
 
   def insert(dn, value)
-    dn.reverse_each do |pair|
-      component = LDAP::Server::DN.join(pair)
+    dn.reverse_each do |component|
       @children[component] = Node.new(self) if @children[component].nil?
       dn.dname.pop
       if dn.any?
@@ -55,16 +57,33 @@ class Node
     end
   end
 
+  # Lookup a node and returns its value or nil if it's not in the tree
   def lookup(dn)
-    if dn.dname.empty?
-      return @value
+    return @value if dn.dname.empty?
+    component = dn.dname.pop
+    @children.each do |key, value|
+      if key.keys.first == component.keys.first
+        if key.values.first.start_with?(':') or key.values.first == component.values.first
+          return value.lookup dn
+        end
+      end
     end
-    dn.reverse_each do |pair|
-      component = LDAP::Server::DN.join(pair)
-      return nil if @children[component].nil?
-      dn.dname.pop
-      return @children[component].lookup dn
+    return nil
+  end
+
+  # Lookup a node and return its value or the value of the nearest ancestor
+  def match(dn)
+    return @value if dn.dname.empty?
+    component = dn.dname.pop
+    @children.each do |key, value|
+      if key.keys.first == component.keys.first
+        if key.values.first.start_with?(':') or key.values.first == component.values.first
+          ret = value.match dn
+          return ret ? ret : @value
+        end
+      end
     end
+    return @value
   end
 
   def value
@@ -77,11 +96,11 @@ class Node
 
   def print_tree(prefix = '')
     if @value
-      p "#{prefix}=> #{@value}"
+      p "#{prefix}{{#{@value}}}"
     end
     @children.each do |key, value|
-        p "#{prefix}#{key}"
-      @children[key].to_s("#{prefix}  ")
+        p "#{prefix}#{key.keys.first} => #{key.values.first}"
+      @children[key].print_tree("#{prefix}  ")
     end
   end
 end
