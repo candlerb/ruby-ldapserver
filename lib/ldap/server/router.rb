@@ -24,6 +24,7 @@ class Router
   ######################
   ### Initialization ###
   ######################
+
   def route(operation, hash)
     hash.each do |key, value|
       if key.nil?
@@ -45,43 +46,17 @@ class Router
   end
 
 
-  ##########################################
-  ### Methods to parse each request type ###
-  ##########################################
+  ####################################################
+  ### Methods to parse and route each request type ###
+  ####################################################
 
   def do_bind(connection, messageId, protocolOp, controls) # :nodoc:
     request = Request.new(connection, messageId)
     version = protocolOp.value[0].value
     dn = protocolOp.value[1].value
-    dn = nil if dn == ""
+    dn = nil if dn.empty?
     authentication = protocolOp.value[2]
 
-    case authentication.tag   # tag_class == :CONTEXT_SPECIFIC (check why)
-    when 0
-      route_bind(request, version, dn, authentication.value)
-    when 3
-      mechanism = authentication.value[0].value
-      credentials = authentication.value[1].value
-      # sasl_bind(version, dn, mechanism, credentials)
-      # FIXME: needs to exchange further BindRequests
-      # route_bind(request, version, dn, mechanism, credentials)
-      raise LDAP::ResultError::AuthMethodNotSupported
-    else
-      raise LDAP::ResultError::ProtocolError, "BindRequest bad AuthenticationChoice"
-    end
-    request.send_BindResponse(0)
-    return dn, version
-
-  rescue LDAP::ResultError => e
-    request.send_BindResponse(e.to_i, :errorMessage=>e.message)
-    return nil, version
-  end
-
-
-  ##########################################
-  ### Methods to route each request type ###
-  ##########################################
-  def route_bind(request, version, dn, password)
     route, action = @routes.match("#{dn},op=bind")
     @logger.error "Route #{route} has no action!" if action.nil?
 
@@ -89,18 +64,36 @@ class Router
     method_name = action.split('#').last
 
     params = LDAP::Server::DN.new("#{dn},op=bind").parse(route)
-    begin
-      Object.const_get(class_name).send method_name, request, version, dn, password, params
-    rescue NoMethodError => e
-      @logger.error e
+
+    case authentication.tag   # tag_class == :CONTEXT_SPECIFIC (check why)
+    when 0
+      Object.const_get(class_name).send method_name, request, version, dn, authentication.value, params
+    when 3
+      mechanism = authentication.value[0].value
+      credentials = authentication.value[1].value
+      # sasl_bind(version, dn, mechanism, credentials)
+      # FIXME: needs to exchange further BindRequests
+      # route_sasl_bind(request, version, dn, mechanism, credentials)
+      raise LDAP::ResultError::AuthMethodNotSupported
+    else
+      raise LDAP::ResultError::ProtocolError, "BindRequest bad AuthenticationChoice"
     end
+    request.send_BindResponse(0)
+    return dn, version
+  rescue NoMethodError => e
+    @logger.error e
+    request.send_BindResponse(LDAP::ResultError::OperationsError.new.to_i, :errorMessage => e.message)
+    return nil, version
+  rescue LDAP::ResultError => e
+    request.send_BindResponse(e.to_i, :errorMessage => e.message)
+    return nil, version
   end
 
 
   ######################################################
   ### Methods to actually perform the work requested ###
   ### The methods below are examples to illustrate   ###
-  ### the arguments given to the various functions   ###
+  ### the signature of the various functions         ###
   ######################################################
 
   # Handle a simple bind request; raise an exception if the bind is

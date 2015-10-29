@@ -18,7 +18,7 @@ $logger = Logger.new($stderr)
 class LDAPController
   def self.bind(request, version, dn, password, params)
     $logger.debug "Catchall bind request"
-    raise LDAP::ResultError::UnwillingToPerform "Invalid bind DN"
+    raise LDAP::ResultError::UnwillingToPerform, "Invalid bind DN"
   end
 
   def self.bindUser(request, version, dn, password, params)

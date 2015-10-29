@@ -92,14 +92,6 @@ class Node
     return path, @value
   end
 
-  def value
-    @value
-  end
-
-  def value=(value)
-    @value = value
-  end
-
   def print_tree(prefix = '')
     if @value
       p "#{prefix}{{#{@value}}}"
