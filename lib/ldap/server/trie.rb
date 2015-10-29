@@ -27,7 +27,7 @@ class Trie
 
   def match(dn)
     split_dn = LDAP::Server::DN.new(dn)
-    @root.match split_dn
+    @root.match split_dn, ''
   end
 
   def print_tree
@@ -72,18 +72,24 @@ class Node
   end
 
   # Lookup a node and return its value or the value of the nearest ancestor
-  def match(dn)
-    return @value if dn.dname.empty?
+  def match(dn, path)
+    return path, @value if dn.dname.empty?
     component = dn.dname.pop
     @children.each do |key, value|
       if key.keys.first == component.keys.first
         if key.values.first.start_with?(':') or key.values.first == component.values.first
-          ret = value.match dn
-          return ret ? ret : @value
+          path.prepend ',' unless path.empty?
+          path.prepend "#{LDAP::Server::DN.join key}"
+          new_path, new_value = value.match dn, path
+          if new_value
+            return new_path, new_value
+          else
+            return (@value ? path : nil), @value
+          end
         end
       end
     end
-    return @value
+    return path, @value
   end
 
   def value

@@ -15,8 +15,8 @@ class TestTrie < Test::Unit::TestCase
     assert_equal trie.lookup('ou=Users,dc=mydomain,dc=com,op=search'), 'UsersSearchTree'
     assert_equal trie.lookup('ou=Groups,dc=mydomain,dc=com,op=search'), 'GroupsSearchTree'
     assert_equal trie.lookup('dc=mydomain,dc=com,op=search'), 'RootSearchValue'
-    assert trie.lookup('ou=DoesNotExist,dc=mydomain,dc=com,op=search').nil?
-    assert trie.lookup('dc=mydomain,dc=com,op=bind').nil?
+    assert_nil trie.lookup('ou=DoesNotExist,dc=mydomain,dc=com,op=search')
+    assert_nil trie.lookup('dc=mydomain,dc=com,op=bind')
   end
 
   def test_trie_wildcard
@@ -34,14 +34,19 @@ class TestTrie < Test::Unit::TestCase
     trie = LDAP::Trie.new do |trie|
       trie.insert 'uid=:uid,ou=Users,dc=mydomain,dc=com', 'SpecificUsers'
       trie.insert 'ou=Users,dc=mydomain,dc=com', 'Users'
-      trie.insert 'dc=mydomain,dc=com', 'Domain'
+      trie.insert 'dc=mydomain,dc=com', 'Domains'
     end
 
-    assert_equal trie.match('uid=john,ou=Users,dc=mydomain,dc=com'), 'SpecificUsers'
-    assert_equal trie.match('cn=john,ou=Users,dc=mydomain,dc=com'), 'Users'
-    assert_equal trie.match('ou=Users,dc=mydomain,dc=com'), 'Users'
-    assert_equal trie.match('dc=mydomain,dc=com'), 'Domain'
-    assert_equal trie.match('dc=otherdomain,dc=com'), nil
+    assert_equal trie.match('uid=john,ou=Users,dc=mydomain,dc=com'),
+                                ['uid=:uid,ou=Users,dc=mydomain,dc=com', 'SpecificUsers']
+    assert_equal trie.match('cn=john,ou=Users,dc=mydomain,dc=com'),
+                                ['ou=Users,dc=mydomain,dc=com', 'Users']
+    assert_equal trie.match('ou=Users,dc=mydomain,dc=com'),
+                                ['ou=Users,dc=mydomain,dc=com', 'Users']
+    assert_equal trie.match('dc=mydomain,dc=com'),
+                                ['dc=mydomain,dc=com', 'Domains']
+    assert_equal trie.match('dc=otherdomain,dc=com'),
+                                [nil, nil]
   end
 
 end
