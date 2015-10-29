@@ -188,13 +188,19 @@ class Server
     # > dn.parse("uid=:uid, ou=:category, dc=mydomain, dc=com")
     # => { :uid => "user", :category => "Users" }
     def parse(template_dn)
-      return false if not equal_format?(template_dn)
-
       result = {}
       template = LDAP::Server::Operation.split_dn(template_dn)
-      @dname.zip(template).each do |const, var|
-        if var.values.first.start_with?(':')
-          result[var.values.first[1..-1].to_sym] = const.values.first
+      template.reverse.zip(@dname.reverse).each do |temp, const|
+        break if const and temp.keys.first != const.keys.first
+        if temp.values.first.start_with?(':')
+          sym = temp.values.first[1..-1].to_sym
+          if const
+            result[sym] = const.values.first unless result[sym]
+          else
+            result[sym] = nil
+          end
+        elsif temp.values.first != const.values.first
+          break
         end
       end
       result
