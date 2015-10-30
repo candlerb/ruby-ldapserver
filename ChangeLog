@@ -1,3 +1,6 @@
+0.6.0 - 2015-10-30
+* Add an experimental request router as alternative to using OperationClass
+
 0.5.3
 * Handle BN as client_timelimit; fixes incompatibility with some LDAP
 implementations (notably Shibboleth IdP v2 and proftpd).
