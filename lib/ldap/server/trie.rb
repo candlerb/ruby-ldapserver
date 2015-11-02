@@ -1,12 +1,17 @@
-# Quick implementation of an LDAP prefix tree or 'trie'
-
 require 'ldap/server/dn'
 
 module LDAP
 class Server
 class Trie
+
+  # Trie or prefix tree suitable for storing LDAP paths
+  # Variables (wildcards) are supported
+
+  class NodeNotFoundError < Error; end
+
   attr_accessor :parent, :value, :children
 
+  # Create a new Trie. Use with a block
   def initialize(parent = nil, value = nil)
     @parent = parent
     @value = value
@@ -15,10 +20,12 @@ class Trie
     yield self if block_given?
   end
 
+  # Insert a path (empty node)
   def <<(dn)
     insert(dn)
   end
 
+  # Insert a node with a value
   def insert(dn, value = nil)
     dn = LDAP::Server::DN.new(dn || '') if not dn.is_a? LDAP::Server::DN
     dn.reverse_each do |component|
@@ -32,7 +39,8 @@ class Trie
     end
   end
 
-  # Lookup a node and returns its value or nil if it's not in the tree
+  # Looks up a node and returns its value or raises
+  # LDAP::Server::Trie::NodeNotFoundError if it's not in the tree
   def lookup(dn)
     dn = LDAP::Server::DN.new(dn || '') if not dn.is_a? LDAP::Server::DN
     return @value if dn.dname.empty?
@@ -44,10 +52,11 @@ class Trie
         end
       end
     end
-    return nil
+    raise NodeNotFoundError
   end
 
-  # Lookup a node and return its value or the value of the nearest ancestor
+  # Looks up a node and returns its value or the (non-nil) value of
+  # the nearest ancestor.
   def match(dn, path = '')
     dn = LDAP::Server::DN.new(dn || '') if not dn.is_a? LDAP::Server::DN
     return path, @value if dn.dname.empty?
