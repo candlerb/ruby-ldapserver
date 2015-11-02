@@ -3,51 +3,26 @@
 require 'ldap/server/dn'
 
 module LDAP
+class Server
 class Trie
-  @root
-
-  def initialize
-    @root = Node.new
-    yield self if block_given?
-  end
-
-  def <<(dn)
-    insert dn, nil
-  end
-
-  def insert(dn, value = nil)
-    split_dn = LDAP::Server::DN.new(dn)
-    @root.insert split_dn, value
-  end
-
-  def lookup(dn)
-    split_dn = LDAP::Server::DN.new(dn)
-    @root.lookup split_dn
-  end
-
-  def match(dn)
-    split_dn = LDAP::Server::DN.new(dn)
-    @root.match split_dn, ''
-  end
-
-  def print_tree
-    @root.print_tree
-  end
-
-end
-
-class Node
   attr_accessor :parent, :value, :children
 
   def initialize(parent = nil, value = nil)
     @parent = parent
     @value = value
     @children = Hash.new
+
+    yield self if block_given?
   end
 
-  def insert(dn, value)
+  def <<(dn)
+    insert(dn)
+  end
+
+  def insert(dn, value = nil)
+    dn = LDAP::Server::DN.new(dn || '') if not dn.is_a? LDAP::Server::DN
     dn.reverse_each do |component|
-      @children[component] = Node.new(self) if @children[component].nil?
+      @children[component] = Trie.new(self) if @children[component].nil?
       dn.dname.pop
       if dn.any?
         @children[component].insert dn, value
@@ -59,6 +34,7 @@ class Node
 
   # Lookup a node and returns its value or nil if it's not in the tree
   def lookup(dn)
+    dn = LDAP::Server::DN.new(dn || '') if not dn.is_a? LDAP::Server::DN
     return @value if dn.dname.empty?
     component = dn.dname.pop
     @children.each do |key, value|
@@ -72,7 +48,8 @@ class Node
   end
 
   # Lookup a node and return its value or the value of the nearest ancestor
-  def match(dn, path)
+  def match(dn, path = '')
+    dn = LDAP::Server::DN.new(dn || '') if not dn.is_a? LDAP::Server::DN
     return path, @value if dn.dname.empty?
     component = dn.dname.pop
     @children.each do |key, value|
@@ -101,5 +78,6 @@ class Node
       @children[key].print_tree("#{prefix}  ")
     end
   end
+end
 end
 end

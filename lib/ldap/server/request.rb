@@ -1,5 +1,5 @@
 module LDAP
-class Router
+class Server
 
   class Request
     attr_accessor :connection, :typesOnly, :attributes, :rescount, :sizelimit

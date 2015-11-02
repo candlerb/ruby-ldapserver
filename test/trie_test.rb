@@ -4,7 +4,7 @@ require 'ldap/server/trie'
 class TestTrie < Test::Unit::TestCase
 
   def test_trie_base
-    trie = LDAP::Trie.new do |trie|
+    trie = LDAP::Server::Trie.new do |trie|
       trie.insert 'ou=Users,dc=mydomain,dc=com,op=bind', 'UsersBindTree'
       trie.insert 'ou=Users,dc=mydomain,dc=com,op=search', 'UsersSearchTree'
       trie.insert 'ou=Groups,dc=mydomain,dc=com,op=search', 'GroupsSearchTree'
@@ -15,12 +15,13 @@ class TestTrie < Test::Unit::TestCase
     assert_equal trie.lookup('ou=Users,dc=mydomain,dc=com,op=search'), 'UsersSearchTree'
     assert_equal trie.lookup('ou=Groups,dc=mydomain,dc=com,op=search'), 'GroupsSearchTree'
     assert_equal trie.lookup('dc=mydomain,dc=com,op=search'), 'RootSearchValue'
-    assert_nil trie.lookup('ou=DoesNotExist,dc=mydomain,dc=com,op=search')
-    assert_nil trie.lookup('dc=mydomain,dc=com,op=bind')
+    assert_nil trie.lookup 'ou=DoesNotExist,dc=mydomain,dc=com,op=search'
+    assert_nil trie.lookup 'dc=mydomain,dc=com,op=bind'
+    assert_nil trie.lookup nil
   end
 
   def test_trie_wildcard
-    trie = LDAP::Trie.new do |trie|
+    trie = LDAP::Server::Trie.new do |trie|
       trie.insert 'uid=:uid,ou=Users,dc=mydomain,dc=com', 'SpecificUsers'
       trie.insert 'ou=Users,dc=mydomain,dc=com', 'Users'
     end
@@ -31,7 +32,7 @@ class TestTrie < Test::Unit::TestCase
   end
 
   def test_trie_match
-    trie = LDAP::Trie.new do |trie|
+    trie = LDAP::Server::Trie.new do |trie|
       trie.insert 'uid=:uid,ou=Users,dc=mydomain,dc=com', 'SpecificUsers'
       trie.insert 'ou=Users,dc=mydomain,dc=com', 'Users'
       trie.insert 'dc=mydomain,dc=com', 'Domains'

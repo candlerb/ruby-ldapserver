@@ -5,6 +5,7 @@ require 'ldap/server/request'
 require 'ldap/server/filter'
 
 module LDAP
+class Server
 class Router
   @logger
   @routes
@@ -207,5 +208,6 @@ class Router
 #      debug "search(#{basedn}, #{scope}, #{deref}, #{filter})"
 #      raise LDAP::ResultError::UnwillingToPerform, "search not implemented"
 #    end
+end
 end
 end
