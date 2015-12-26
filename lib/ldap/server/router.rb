@@ -34,10 +34,9 @@ class Router
     self.instance_eval(&block)
   end
 
-  def log(e, level)
+  def log_exception(e, level = :error)
     @logger.send level, e.message
     e.backtrace.each { |line| @logger.send level, "\tfrom#{line}" }
-
   end
 
   ######################
@@ -48,10 +47,10 @@ class Router
     hash.each do |key, value|
       if key.nil?
         @routes.insert "op=#{operation.to_s}", value
-        @logger.info "#{operation.to_s} all routes to #{value}"
+        @logger.debug "#{operation.to_s} all routes to #{value}"
       else
         @routes.insert "#{key},op=#{operation.to_s}", value
-        @logger.info "#{operation.to_s} #{key} to #{value}"
+        @logger.debug "#{operation.to_s} #{key} to #{value}"
       end
     end
   end
@@ -68,11 +67,13 @@ class Router
   ####################################################
   ### Methods to parse and route each request type ###
   ####################################################
-
   def parse_route(dn, method)
     route, action = @routes.match("#{dn},op=#{method.to_s}")
+    if not route or route.empty?
+      raise LDAP::ResultError::UnwillingToPerform
+    end
     if action.nil?
-      @logger.error "Route #{route} has no action!"
+      log_exception "Route '#{route}' has no action!"
       raise LDAP::ResultError::UnwillingToPerform
     end
 
@@ -90,6 +91,8 @@ class Router
     dn = protocolOp.value[1].value
     dn = nil if dn.empty?
     authentication = protocolOp.value[2]
+
+    @logger.debug "subject:#{connection.binddn} predicate:bind object:#{dn}"
 
     # Find a route in the routing tree
     class_name, method_name, params = parse_route(dn, :bind)
@@ -110,7 +113,7 @@ class Router
     request.send_BindResponse(0)
     return dn, version
   rescue NoMethodError => e
-    log e, :error
+    log_exception e
     request.send_BindResponse(LDAP::ResultError::OperationsError.new.to_i, :errorMessage => e.message)
     return nil, version
   rescue LDAP::ResultError => e
@@ -152,6 +155,8 @@ class Router
     t = request.server_timelimit || 10
     t = client_timelimit if client_timelimit > 0 and client_timelimit < t
 
+    @logger.debug "subject:#{connection.binddn} predicate:search object:#{baseObject}"
+
     # Find a route in the routing tree
     class_name, method_name, params = parse_route(baseObject, :search)
 
@@ -173,7 +178,7 @@ class Router
   # forever for a response.
 
   rescue Exception => e
-    log e, :error
+    log_exception e
     request.send_SearchResultDone(LDAP::ResultError::OperationsError.new.to_i, :errorMessage=>e.message)
   end
 

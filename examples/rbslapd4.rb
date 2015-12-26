@@ -25,28 +25,24 @@ class LDAPController
     if params[:uid].nil? or
         params[:uid] != 'admin' or
         password != 'adminpassword'
-      $logger.debug "Denied access for user #{params[:uid]}"
+      $logger.warn "Denied access for user #{params[:uid]}: Invalid credentials"
       raise LDAP::ResultError::InvalidCredentials, "Invalid credentials"
     end
 
-    $logger.debug "Authenticated user #{params[:uid]}"
+    $logger.info "Authenticated user #{params[:uid]}"
   end
 
   def self.search(request, baseObject, scope, deref, filter, params)
-    $logger.debug "Catchall search request"
+    $logger.info "Catchall search request for #{baseObject}"
     raise LDAP::ResultError::UnwillingToPerform, "Invalid search DN"
   end
 
-  def self.searchUser(request, baseObject, scope, deref, filter, params)
-    if params[:uid].nil?
-      raise LDAP::ResultError::UnwillingToPerform, "Invalid search DN"
-    end
-
-    $logger.debug "Search user #{params[:uid]}"
+  def self.searchUsers(request, baseObject, scope, deref, filter, params)
+    $logger.info "Search users"
   end
 end
 
-router = LDAP::Router.new($logger) do
+router = LDAP::Server::Router.new($logger) do
   # Different syntax but same thing
   bind    nil => "LDAPController#bind"
   route   :bind, nil => "LDAPController#bind"
@@ -56,7 +52,7 @@ router = LDAP::Router.new($logger) do
   bind    "uid=:uid,ou=Users,dc=mydomain,dc=com" => "LDAPController#bindUser"
 
   search  nil => "LDAPController#search"
-  search  "uid=:uid,ou=Users,dc=mydomain,dc=com" => "LDAPController#searchUser"
+  search  "ou=Users,dc=mydomain,dc=com" => "LDAPController#searchUsers"
 end
 
 
