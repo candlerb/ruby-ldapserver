@@ -36,7 +36,7 @@ class Router
 
   def log_exception(e, level = :error)
     @logger.send level, e.message
-    e.backtrace.each { |line| @logger.send level, "\tfrom#{line}" }
+    e.backtrace.each { |line| @logger.send level, "\tfrom#{line}" } if e.backtrace
   end
 
   ######################
@@ -47,10 +47,10 @@ class Router
     hash.each do |key, value|
       if key.nil?
         @routes.insert "op=#{operation.to_s}", value
-        @logger.debug "#{operation.to_s} all routes to #{value}"
+        @logger.debug "map operation #{operation.to_s} all routes to #{value}"
       else
         @routes.insert "#{key},op=#{operation.to_s}", value
-        @logger.debug "#{operation.to_s} #{key} to #{value}"
+        @logger.debug "map #{operation.to_s} #{key} to #{value}"
       end
     end
   end
@@ -70,10 +70,11 @@ class Router
   def parse_route(dn, method)
     route, action = @routes.match("#{dn},op=#{method.to_s}")
     if not route or route.empty?
+      @logger.warn "No route defined for \'#{route}\'"
       raise LDAP::ResultError::UnwillingToPerform
     end
     if action.nil?
-      log_exception "Route '#{route}' has no action!"
+      @logger.error "No action defined for route \'#{route}\'"
       raise LDAP::ResultError::UnwillingToPerform
     end
 
@@ -117,6 +118,7 @@ class Router
     request.send_BindResponse(LDAP::ResultError::OperationsError.new.to_i, :errorMessage => e.message)
     return nil, version
   rescue LDAP::ResultError => e
+    log_exception e
     request.send_BindResponse(e.to_i, :errorMessage => e.message)
     return nil, version
   end
