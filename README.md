@@ -2,13 +2,6 @@
 
 ruby-ldapserver is a lightweight, pure Ruby framework for implementing LDAP server applications. It is intended primarily for building a gateway from LDAP queries into some other protocol or database. It does not attempt to be a full or correct implementation of the standard LDAP data model itself (although you could build one using this as a frontend).
 
-Its main features are:
- - Request router
- - Support for UNIX domain sockets
- - Binding to port 389, then dropping privileges
-
-The Connection class handles incoming connections, decodes ASN1-formatted LDAP requests, and creates an Operation object for each request. The Operation object further parses the ASN1 request and invokes methods which you override to perform useful work. Responses and exceptions are converted back into ASN1 and returned to the client. Optionally, a collection of objects can be used to implement a Schema (e.g. normalize attribute names, validate add and modify operations, perform appropriate matching operations)
-
 Since it's written entirely in Ruby, it benefits from Ruby's threading engine.
 
 ## Target audience

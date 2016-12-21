@@ -7,12 +7,12 @@ Gem::Specification.new do |s|
   s.name = %q{ruby-ldapserver}
   s.version = LDAP::Server::VERSION
 
-  s.authors = ["Brian Candler"]
+  s.authors = ["Brian Candler", "Florian Dejonckheere"]
   s.description = %q{ruby-ldapserver is a lightweight, pure-Ruby skeleton for implementing LDAP server applications.}
-  s.email = %q{B.Candler@pobox.com}
+  s.email = ["B.Candler@pobox.com", "florian@floriandejonckheere.be"]
   s.files = `git ls-files`.split($/)
-  s.homepage = %q{https://github.com/inscitiv/ruby-ldapserver}
-  s.rdoc_options = ["--main", "README.txt"]
+  s.homepage = %q{https://github.com/floriandejonckheere/ruby-ldapserver}
+  s.rdoc_options = ["--main", "README.md"]
   s.require_paths = ["lib"]
   s.summary = %q{A pure-Ruby framework for building LDAP servers}
   s.test_files = s.files.grep(%r{^(test|spec|features)/})
