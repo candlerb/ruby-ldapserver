@@ -1,8 +1,11 @@
 # ruby-ldapserver
 
-ruby-ldapserver is a lightweight, pure Ruby skeleton for implementing LDAP server applications. It is intended primarily for when you wish to build a gateway from LDAP queries into some other protocol or database; it does not attempt to be a full implementation of the standard LDAP data model itself (although you could build one using this as a frontend).
+ruby-ldapserver is a lightweight, pure Ruby framework for implementing LDAP server applications. It is intended primarily for building a gateway from LDAP queries into some other protocol or database. It does not attempt to be a full or correct implementation of the standard LDAP data model itself (although you could build one using this as a frontend).
 
-This branch includes a simple request router, mapping predefined (potentially parameterized) DNs and actions to a controller action, allowing for simple and flexible servers instead of large and unmaintainable codebases.
+Its main features are:
+ - Request router
+ - Support for UNIX domain sockets
+ - Binding to port 389, then dropping privileges
 
 The Connection class handles incoming connections, decodes ASN1-formatted LDAP requests, and creates an Operation object for each request. The Operation object further parses the ASN1 request and invokes methods which you override to perform useful work. Responses and exceptions are converted back into ASN1 and returned to the client. Optionally, a collection of objects can be used to implement a Schema (e.g. normalize attribute names, validate add and modify operations, perform appropriate matching operations)
 
@@ -16,32 +19,54 @@ The examples/ directory contains a few minimal LDAP servers which you can use as
 
 ## Status
 
-This is an early release. It works for me as an LDAP protocol convertor; the Schema stuff has not been heavily tested by me.
+This is still an early release. It works for me as an LDAP protocol layer; the Schema stuff has not been heavily tested.
 
+## Request router
 
-## CHANGES FROM VERSION 0.2 TO VERSION 0.3
+The request router is a simple mapping of potentially parameterized routes (DNs) and actions to a *controller* action, allowing for simple, flexible and maintainable code. Alternatively the legacy `Operation` class can be used. See the `examples/` directory for more details and sample implementations.
 
-There have been substantial changes to ruby-ldapserver between version 0.2 and version 0.3. If you have not been using 0.2, you can skip this section.
+## Configuration
 
-Major API changes:
-
-- I have renamed module LDAPServer to module LDAP::Server, This means e.g. `require 'ldapserver/connection'` becomes `require 'ldap/server/connection'`
-
-- I have moved the result exceptions to be subclasses of `LDAP::ResultError`, for consistency with ruby-ldap, and named under `LDAP::ResultError::<name>` togroup them together. Everything else remains under `LDAP::Server`.
-
-- The format of the parsed 'filter' parameter to `Operation#search` has changed. See `filter.rb`. In particular, the format of a :substrings filter has been changed (simplified).
-
-- The format of the 'modinfo' parameter to `Operation#modify` has changed. See the comment above 'def modify' in operation.rb
-
-- Attribute names are no longer automatically downcased. If you are running with a schema, however, then they will be converted into their preferred forms. That is, "OBJECTCLASS" will become "objectClass", "CommonName" will become "cn", and so on.
-
-Improvements include:
-
-- There is now an explicit object representing a server instance: `LDAP::Server`. This bundles together the root DSE, the schema (if used), the subclass of `Operation` which you wish to use, and various other parameters such as ssl certificate data. It has methods `run_tcpserver` and `run_prefork`, making it straightforward to start a server. Both support SSL on connect. You can do `require 'ldap/server'` to get all the essential libraries for a server.
-
-- `LDAP::Server` :user and :group settings let you drop privileges after binding to port 389.
-
-- Schema support. Can load schemas in OpenLDAP format, publish them via LDAP, validate add/modify operations, use them to map attribute names to their 'standard' versions (e.g. "commonname" becomes "cn"), and perform case-insensitive comparisons where the schema mandates this. See classes `LDAP::Server::Schema`, `LDAP::Server::ObjectClass`, `LDAP::Server::AttributeType`, `LDAP::Server::Syntax`, `LDAP::Server::MatchingRule`, and `examples/rbslapd3.rb`.
+```ruby
+params = {
+  # Bind to address (cannot be combined with socket)
+  :bindaddr => '127.0.0.1', # defaults to 0.0.0.0
+  :port => 1389,
+  
+  # Bind to socket (cannot be combined with address)
+  :socket => '/tmp/ldap.sock',
+  
+  # Drop process and socket privileges to user and/or group (cannot be combined with uid/gid)
+  :user => 'ldap',
+  :group => 'ldap',
+  
+  # Drop process and socket privileges to UID and/or GID (cannot be combined with user/group)
+  :uid => 1000,
+  :gid => 1000,
+  
+  # TCP_NODELAY option
+  :nodelay => true,
+  
+  # Socket backlog
+  :listen => 10,
+  
+  # SSL/TLS
+  :ssl_key_file => 'key.pem',
+  :ssl_cert_file => 'cert.pem',
+  :ssl_on_connect => true,
+  
+  # Request router (cannot be combined with legacy operation)
+  :router => MyAppRouter,
+  
+  # Legacy Operation class (cannot be combined with request router)
+  :operation_class => MyAppOperation,
+  :operation_args => ['my', 'arguments'],
+  
+  # Schema
+  :schema => my_schema,
+  :namingContexts => ['dc=example,dc=com']
+}
+```
 
 ## Libraries
 

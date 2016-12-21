@@ -1,4 +1,5 @@
 require 'socket'
+require 'fileutils'
 
 module LDAP
 class Server
@@ -24,6 +25,7 @@ class Server
   def self.tcpserver(opt, &blk)
     if opt[:socket]
       server = UNIXServer.new(opt[:socket])
+      FileUtils.chmod(0777, opt[:socket])
     else
       server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
     end
@@ -32,6 +34,13 @@ class Server
     require 'etc' if opt[:group] or opt[:user]
     Process.gid = Process.egid = Etc.getgrnam(opt[:group]).gid if opt[:group]
     Process.uid = Process.euid = Etc.getpwnam(opt[:user]).uid if opt[:user]
+
+    Process.gid = opt[:gid] if opt[:gid]
+    Process.uid = opt[:uid] if opt[:uid]
+
+    if opt[:socket]
+      FileUtils.chown((opt[:user] || opt[:uid]), (opt[:group] || opt[:gid]), opt[:socket])
+    end
 
     # Typically the O/S will buffer response data for 100ms before sending.
     # If the response is sent as a single write() then there's no need for it.
