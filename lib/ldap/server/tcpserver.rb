@@ -22,13 +22,17 @@ class Server
   #   :nodelay=>true				- set TCP_NODELAY option
 
   def self.tcpserver(opt, &blk)
-    server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
+    if opt[:socket]
+      server = UNIXServer.new(opt[:socket])
+    else
+      server = TCPServer.new(opt[:bindaddr] || "0.0.0.0", opt[:port])
+    end
 
     # Drop privileges if requested
     require 'etc' if opt[:group] or opt[:user]
     Process.gid = Process.egid = Etc.getgrnam(opt[:group]).gid if opt[:group]
     Process.uid = Process.euid = Etc.getpwnam(opt[:user]).uid if opt[:user]
-   
+
     # Typically the O/S will buffer response data for 100ms before sending.
     # If the response is sent as a single write() then there's no need for it.
     if opt[:nodelay]
@@ -86,4 +90,4 @@ if __FILE__ == $0
   end
   #sleep 10; t.raise Interrupt	# uncomment to run for fixed time period
   t.join
-end 
+end
