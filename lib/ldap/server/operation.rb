@@ -46,9 +46,9 @@ class Server
     def debug msg
       @connection.debug msg
     end
-    
+
     # Send an exception report to the log
-    
+
     def log_exception msg
       @connection.log_exception msg
     end
@@ -85,7 +85,7 @@ class Server
         seq << OpenSSL::ASN1::Sequence(rs, 3, :IMPLICIT, :APPLICATION)
       end
       yield seq if block_given?   # opportunity to add more elements
-        
+
       send_LDAPMessage(OpenSSL::ASN1::Sequence(seq, tag, :IMPLICIT, :APPLICATION), opt)
     end
 
@@ -125,7 +125,7 @@ class Server
         end
 
         if @typesOnly
-          vals = [] 
+          vals = []
         else
           vals = [vals] unless vals.kind_of?(Array)
           # FIXME: optionally do a value_to_s conversion here?

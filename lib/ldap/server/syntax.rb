@@ -230,6 +230,6 @@ class Server
     add("1.3.6.1.4.1.1466.115.121.1.40", "Octet String")
     add("1.3.6.1.4.1.1466.115.121.1.58", "Substring Assertion")
   end
-    
+
 end # class Server
 end # module LDAP
