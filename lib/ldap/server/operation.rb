@@ -1,4 +1,5 @@
 require 'timeout'
+require 'openssl'
 require 'ldap/server/result'
 require 'ldap/server/filter'
 
