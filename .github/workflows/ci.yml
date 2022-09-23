@@ -25,19 +25,15 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: ruby/setup-ruby-pkgs@v1
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}      # passed to ruby/setup-ruby
-          apt-get: "libldap-dev libsasl2-dev" # Ubuntu
-          brew: "openldap cyrus-sasl"     # macOS
-          mingw: "openldap cyrus-sasl"   # Windows mingw / mswin /ucrt
 
       - name: Print tool versions
         run: |
           ruby -v
-          gcc -v
           gem env
 
       - name: Bundle install
