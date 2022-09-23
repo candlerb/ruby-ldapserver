@@ -106,7 +106,7 @@ class TestLdap < Test::Unit::TestCase
 
   def open_child
     case RUBY_PLATFORM
-    when 'java'
+    when 'java', /mingw|mswin/
       open_child_java
     else
       open_child_posix
