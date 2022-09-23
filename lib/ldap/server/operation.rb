@@ -201,8 +201,8 @@ class Server
       when 0
         simple_bind(version, dn, authentication.value)
       when 3
-        mechanism = authentication.value[0].value
-        credentials = authentication.value[1].value
+        # mechanism = authentication.value[0].value
+        # credentials = authentication.value[1].value
         # sasl_bind(version, dn, mechanism, credentials)
         # FIXME: needs to exchange further BindRequests
         raise LDAP::ResultError::AuthMethodNotSupported
