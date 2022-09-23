@@ -78,11 +78,11 @@ class TestLdap < Test::Unit::TestCase
     end
 
     def read *a
-      @out_io.read *a
+      @out_io.read(*a)
     end
 
     def write *a
-      @in_io.write *a
+      @in_io.write(*a)
     end
 
     def gets
