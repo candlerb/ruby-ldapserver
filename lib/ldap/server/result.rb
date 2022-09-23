@@ -63,7 +63,7 @@ class ResultError
     53 => UnwillingToPerform,
     # FIXME: please fill in the rest
   }
-  def self.[] (n)
+  def self.[](n)
     return N_TO_CLASS[n] || self
   end
 end # class ResultError
