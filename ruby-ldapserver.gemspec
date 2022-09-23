@@ -21,8 +21,7 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency 'bundler', '>= 1.3', '< 3.0'
   s.add_development_dependency 'rake', '~> 13.0'
-  s.add_development_dependency 'ruby-ldap', '~> 0.9.16' unless RUBY_PLATFORM == 'java'
-  s.add_development_dependency 'jruby-ldap', '~> 0.0' if RUBY_PLATFORM == 'java'
+  s.add_development_dependency 'net-ldap', '~> 0.10'
   s.add_development_dependency 'rspec', '~> 3.1'
   s.add_development_dependency 'test-unit', '~> 3.0'
 end
