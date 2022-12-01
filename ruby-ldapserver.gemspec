@@ -17,7 +17,7 @@ Gem::Specification.new do |s|
   s.summary = %q{A pure-Ruby framework for building LDAP servers}
   s.test_files = s.files.grep(%r{^(test|spec|features)/})
 
-  s.required_ruby_version = '>= 1.9'
+  s.required_ruby_version = '>= 2.3'
 
   s.add_development_dependency 'bundler', '>= 1.3', '< 3.0'
   s.add_development_dependency 'rake', '~> 13.0'

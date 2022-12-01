@@ -27,7 +27,7 @@ class MockOperation < LDAP::Server::Operation
   end
 
   def search(basedn, scope, deref, filter)
-    @@lastop = [:search, basedn, scope.to_i, deref.to_i, filter, @attributes]
+    @@lastop = [:search, basedn, scope.to_i, deref.to_i, filter, @attributes.map(&:name)]
     send_SearchResultEntry("cn=foo", {"a"=>["1","2"], "b"=>"boing"})
     send_SearchResultEntry("cn=bar", {"a"=>["3","4","5"], "b"=>"wibble"})
   end
@@ -113,19 +113,27 @@ class TestLdap < Test::Unit::TestCase
     end
   end
 
+  def ensure_server_started
+    @serv || start_server
+  end
+
+  def start_server(opts={})
+    # back to a single process (the parent). Now we start our
+    # listener thread
+    @serv = LDAP::Server.new({
+        :bindaddr		=> '127.0.0.1',
+        :port			=> PORT,
+        :nodelay		=> true,
+        :operation_class	=> MockOperation,
+      }.merge(opts))
+
+    @serv.run_tcpserver
+  end
+
   def setup
     @ppid = $$
     @io = open_child
-
-    # back to a single process (the parent). Now we start our
-    # listener thread
-    @serv = LDAP::Server.new(
-    	:bindaddr		=> '127.0.0.1',
-    	:port			=> PORT,
-    	:nodelay		=> true,
-    	:operation_class	=> MockOperation
-    )
-    @serv.run_tcpserver
+    @serv = nil
   end
 
   def teardown
@@ -217,6 +225,7 @@ class TestLdap < Test::Unit::TestCase
             raise "Bad Search Result, expected\n#{exp.inspect}\ngot\n#{res.inspect}"
           end
         when "search2"
+          res = {}
           # FIXME: ruby-ldap doesn't seem to allow DEREF options to be set
           conn.search(base: "dc=localhost, dc=localdomain",
                       scope: Net::LDAP::SearchScope_BaseObject,
@@ -225,6 +234,31 @@ class TestLdap < Test::Unit::TestCase
             entry = e.to_h
             dn = entry.delete(:dn).first
             res[dn] = entry
+          end
+        when "search_range"
+          res = {}
+          conn.search(base: "dc=localhost, dc=localdomain",
+                      scope: Net::LDAP::SearchScope_BaseObject,
+                      attributes: ["a;range=1-2", "b"]) do |e|
+            entry = e.to_h
+            dn = entry.delete(:dn).first
+            res[dn] = entry
+          end
+        when "search_range_limit"
+          res = {}
+          conn.search(base: "dc=localhost, dc=localdomain",
+                      scope: Net::LDAP::SearchScope_WholeSubtree,
+                      filter: "(objectclass=*)") do |e|
+            entry = e.to_h
+            dn = entry.delete(:dn).first
+            res[dn] = entry
+          end
+          exp = {
+            "cn=foo" => {a: ["1","2"], b: ["boing"]},
+            "cn=bar" => {a: [], "a;range=0-1": ["3","4"], b: ["wibble"]},
+          }
+          if res != exp
+            raise "Bad Search Result, expected\n#{exp.inspect}\ngot\n#{res.inspect}"
           end
         when "quit"
           out.puts "OK"
@@ -241,6 +275,7 @@ class TestLdap < Test::Unit::TestCase
   end
 
   def req(cmd)
+    ensure_server_started
     @io.puts cmd
     res = @io.gets.chomp
     assert_match(/^OK/, res)
@@ -325,5 +360,22 @@ class TestLdap < Test::Unit::TestCase
                     [:substrings, "cn", nil, nil, "and", "er"],
              ],
       ], ["a","b"]], MockOperation.lastop)
+  end
+
+  def test_search_with_range
+    req("search_range")
+    assert_equal([:search, "dc=localhost, dc=localdomain",
+      LDAP::Server::BaseObject,
+      LDAP::Server::NeverDerefAliases,
+      [:true], ["a","b"]], MockOperation.lastop)
+  end
+
+  def test_search_with_range_limit
+    start_server(attribute_range_limit: 2)
+    req("search_range_limit")
+    assert_equal([:search, "dc=localhost, dc=localdomain",
+      LDAP::Server::WholeSubtree,
+      LDAP::Server::NeverDerefAliases,
+      [:true], []], MockOperation.lastop)
   end
 end
