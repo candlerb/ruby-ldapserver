@@ -62,55 +62,13 @@ class TestLdap < Test::Unit::TestCase
   HOST = '127.0.0.1'
   PORT = 1389
 
-  def open_child_posix
-    IO.popen("-","w+").tap do |io|
-      unless io
-        do_child Kernel, Kernel
-        exit!
-      end
-    end
-  end
-
-  class DoubleIO < IO
-    def initialize out, inio
-      @out_io = out
-      @in_io = inio
-    end
-
-    def read *a
-      @out_io.read(*a)
-    end
-
-    def write *a
-      @in_io.write(*a)
-    end
-
-    def gets
-      @out_io.gets
-    end
-
-    def close
-      @in_io.close
-      @out_io.close
-    end
-  end
-
-  def open_child_java
-    in_rd, in_wr = IO.pipe
-    out_rd, out_wr = IO.pipe
+  def start_client
+    in_ = Queue.new
+    out = Queue.new
     Thread.new do
-      do_child in_rd, out_wr
+      do_child(in_, out)
     end
-    DoubleIO.new(out_rd, in_wr)
-  end
-
-  def open_child
-    case RUBY_PLATFORM
-    when 'java', /mingw|mswin/
-      open_child_java
-    else
-      open_child_posix
-    end
+    return in_, out
   end
 
   def ensure_server_started
@@ -131,8 +89,7 @@ class TestLdap < Test::Unit::TestCase
   end
 
   def setup
-    @ppid = $$
-    @io = open_child
+    @client_in, @client_out = start_client
     @serv = nil
   end
 
@@ -141,11 +98,11 @@ class TestLdap < Test::Unit::TestCase
       @serv.stop
       @serv = nil
     end
-    if @io
-      @io.puts "quit"
-      @io.gets
-      @io.close
-      @io = nil
+    if @client
+      @client_in << "quit"
+      err = @client_out.pop
+      raise err if "OK" != err
+      @client = nil
     end
   end
 
@@ -154,7 +111,7 @@ class TestLdap < Test::Unit::TestCase
   def do_child in_, out
     while true
       begin
-        a = in_.gets.chomp
+        a = in_.deq
         conn ||= Net::LDAP.new(host: HOST, port: PORT)
         case a
         when "bind2"
@@ -186,14 +143,14 @@ class TestLdap < Test::Unit::TestCase
           begin
             case conn.compare("cn=Takaaki Tateishi, dc=localhost, dc=localdomain",
                          "cn", $1)
-            when true; out.puts "OK true"; next
-            when false; out.puts "OK false"; next
+            when true; out << "OK true"; next
+            when false; out << "OK false"; next
             end
           rescue LDAP::ResultError => e
             # For older versions of ruby-ldap
             case e.message
-            when /Compare True/i; out.puts "OK true"; next
-            when /Compare False/i; out.puts "OK false"; next
+            when /Compare True/i; out << "OK true"; next
+            when /Compare False/i; out << "OK false"; next
             end
             raise
           end
@@ -261,23 +218,23 @@ class TestLdap < Test::Unit::TestCase
             raise "Bad Search Result, expected\n#{exp.inspect}\ngot\n#{res.inspect}"
           end
         when "quit"
-          out.puts "OK"
+          out << "OK"
           break
         else
           raise "Bad command! #{a.inspect}"
         end
-        out.puts "OK"
+        out << "OK"
       rescue Exception => e
         $stderr.puts "Child exception: #{e}\n\t#{e.backtrace.join("\n\t")}"
-        out.puts "ERR #{e}"
+        out << "ERR #{e}"
       end
     end
   end
 
   def req(cmd)
     ensure_server_started
-    @io.puts cmd
-    res = @io.gets.chomp
+    @client_in << cmd
+    res = @client_out.deq.chomp
     assert_match(/^OK/, res)
     res
   end
