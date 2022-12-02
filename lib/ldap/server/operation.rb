@@ -99,7 +99,7 @@ class Server
     end
 
 
-    Attribute = Struct.new :name, :range_start, :range_end
+    AttributeRange = Struct.new :start, :end
 
     # Send a found entry. Avs are {attr1=>val1, attr2=>[val2,val3]}
     # If schema given, return operational attributes only if
@@ -113,21 +113,22 @@ class Server
 
       if @schema
         # normalize the attribute names
-        @attributes = @attributes.map { |a| a.name == '*' ? a.name : @schema.find_attrtype(a.name).to_s }
+        @attributes = @attributes.map { |a| a == '*' ? a : @schema.find_attrtype(a).to_s }
       end
 
-      sendall = @attributes == [] || @attributes.find { |a| a.name == "*" }
+      sendall = @attributes == [] || @attributes.include?("*")
       avseq = []
 
       avs.each_with_index do |(attr, vals), aidx|
-        query_attr = @attributes.find { |a| a.name == attr }
-        if !query_attr
+        query_attr_idx = @attributes.index(attr)
+        if !query_attr_idx
           next unless sendall
           if @schema
             a = @schema.find_attrtype(attr)
             next unless a and (a.usage.nil? or a.usage == :userApplications)
           end
         end
+        query_attr = query_attr_idx && @attribute_ranges[query_attr_idx]
 
         if @typesOnly
           vals = []
@@ -137,10 +138,10 @@ class Server
           # FIXME: handle attribute;binary
         end
 
-        if (@attribute_range_limit && vals.size > @attribute_range_limit) || query_attr&.range_start
-          if query_attr&.range_start
-            range_start = query_attr.range_start.to_i
-            range_end = query_attr.range_end == "*" ? -1 : query_attr.range_end.to_i
+        if (@attribute_range_limit && vals.size > @attribute_range_limit) || query_attr&.start
+          if query_attr&.start
+            range_start = query_attr.start.to_i
+            range_end = query_attr.end == "*" ? -1 : query_attr.end.to_i
           else
             range_start = 0
             range_end = @attribute_range_limit ? @attribute_range_limit - 1 : -1
@@ -269,13 +270,19 @@ class Server
       client_timelimit = protocolOp.value[4].value.to_i
       @typesOnly = protocolOp.value[5].value
       filter = Filter::parse(protocolOp.value[6], @schema)
-      @attributes = protocolOp.value[7].value.collect {|x| x.value}
-      @attributes = @attributes.map do |attr|
+      attributes = protocolOp.value[7].value.collect {|x| x.value}
+      attributes = attributes.map do |attr|
         if attr =~ /(.*);range=(\d+)-(\d+|\*)\z/
-          Attribute.new($1, $2, $3)
+          [$1, $2, $3]
         else
-          Attribute.new attr
+          attr
         end
+      end
+      @attributes = attributes.map do |name, |
+        name
+      end
+      @attribute_ranges = attributes.map do |_, range_start, range_end|
+        range_start && AttributeRange.new(range_start, range_end)
       end
 
       @rescount = 0

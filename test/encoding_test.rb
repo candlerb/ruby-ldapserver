@@ -27,7 +27,7 @@ class MockOperation < LDAP::Server::Operation
   end
 
   def search(basedn, scope, deref, filter)
-    @@lastop = [:search, basedn, scope.to_i, deref.to_i, filter, @attributes.map(&:name)]
+    @@lastop = [:search, basedn, scope.to_i, deref.to_i, filter, @attributes]
     send_SearchResultEntry("cn=foo", {"a"=>["1","2"], "b"=>"boing"})
     send_SearchResultEntry("cn=bar", {"a"=>["3","4","5"], "b"=>"wibble"})
   end
