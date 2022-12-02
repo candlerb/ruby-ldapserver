@@ -15,20 +15,31 @@ class Server
 
   # Create a new server. Options include all those to tcpserver/preforkserver
   # plus:
-  #   :operation_class=>Class			- set Operation handler class
-  #   :operation_args=>[...]			- args to Operation.new
-  #   :ssl_key_file=>pem, :ssl_cert_file=>pem	- enable SSL
-  #   :ssl_ca_path=>directory			- verify peer certificates
-  #   :schema=>Schema				- Schema object
-  #   :namingContexts=>[dn, ...]		- base DN(s) we answer
-  
+  # either
+  #   :router=>Router             - request router instance
+  # or
+  #   :operation_class=>Class     - set Operation handler class
+  #   :operation_args=>[...]      - args to Operation.new
+  #
+  #   :ssl_key_file=>pem, :ssl_cert_file=>pem - enable SSL
+  #   :ssl_ca_path=>directory     - verify peer certificates
+  #   :schema=>Schema             - Schema object
+  #   :namingContexts=>[dn, ...]  - base DN(s) we answer
+  #
+  # Specifying a :router always overrides :operation_class
+
   attr_reader :logger
 
   def initialize(opt = DEFAULT_OPT)
     @opt = opt
     @opt[:server] = self
-    @opt[:operation_class] ||= LDAP::Server::Operation
-    @opt[:operation_args] ||= []
+    if @opt[:router]
+      @opt.delete(:operation_class)
+      @opt.delete(:operation_args)
+    else
+      @opt[:operation_class] ||= LDAP::Server::Operation
+      @opt[:operation_args] ||= []
+    end
     unless @opt[:logger]
        @opt[:logger] ||= Logger.new($stderr)
        @opt[:logger].level = Logger::INFO
@@ -92,7 +103,11 @@ class Server
   end
 
   def join
-    @thread.join
+    begin
+      @thread.join
+    rescue Interrupt
+      @logger.info "Exiting..."
+    end
   end
 
   def stop

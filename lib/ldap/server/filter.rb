@@ -202,7 +202,7 @@ class Server
       when :eq, :approx, :le, :ge, :substrings
         # the filter now includes a suitable matching object
         return (filter[2] || LDAP::Server::MatchingRule::DefaultMatch).send(
-                filter.first, av[filter[1].to_s], *filter[3..-1])
+                filter.first, Array(av[filter[1].to_s]), *filter[3..-1])
 
       when :true
         return true

@@ -1,4 +1,5 @@
 require 'timeout'
+require 'openssl'
 require 'ldap/server/result'
 require 'ldap/server/filter'
 
@@ -36,6 +37,7 @@ class Server
       ])
       @schema = @connection.opt[:schema]
       @server = @connection.opt[:server]
+      @attribute_range_limit = @connection.opt[:attribute_range_limit]
     end
 
     def log msg, severity = Logger::INFO
@@ -45,9 +47,9 @@ class Server
     def debug msg
       @connection.debug msg
     end
-    
+
     # Send an exception report to the log
-    
+
     def log_exception msg
       @connection.log_exception msg
     end
@@ -84,7 +86,7 @@ class Server
         seq << OpenSSL::ASN1::Sequence(rs, 3, :IMPLICIT, :APPLICATION)
       end
       yield seq if block_given?   # opportunity to add more elements
-        
+
       send_LDAPMessage(OpenSSL::ASN1::Sequence(seq, tag, :IMPLICIT, :APPLICATION), opt)
     end
 
@@ -95,6 +97,9 @@ class Server
         end
       end
     end
+
+
+    AttributeRange = Struct.new :start, :end
 
     # Send a found entry. Avs are {attr1=>val1, attr2=>[val2,val3]}
     # If schema given, return operational attributes only if
@@ -114,21 +119,41 @@ class Server
       sendall = @attributes == [] || @attributes.include?("*")
       avseq = []
 
-      avs.each do |attr, vals|
-        if !@attributes.include?(attr)
+      avs.each_with_index do |(attr, vals), aidx|
+        query_attr_idx = @attributes.index(attr)
+        if !query_attr_idx
           next unless sendall
           if @schema
             a = @schema.find_attrtype(attr)
             next unless a and (a.usage.nil? or a.usage == :userApplications)
           end
         end
+        query_attr = query_attr_idx && @attribute_ranges[query_attr_idx]
 
         if @typesOnly
-          vals = [] 
+          vals = []
         else
           vals = [vals] unless vals.kind_of?(Array)
           # FIXME: optionally do a value_to_s conversion here?
           # FIXME: handle attribute;binary
+        end
+
+        if (@attribute_range_limit && vals.size > @attribute_range_limit) || query_attr&.start
+          if query_attr&.start
+            range_start = query_attr.start.to_i
+            range_end = query_attr.end == "*" ? -1 : query_attr.end.to_i
+          else
+            range_start = 0
+            range_end = @attribute_range_limit ? @attribute_range_limit - 1 : -1
+          end
+          range_end = range_start + @attribute_range_limit - 1 if @attribute_range_limit && (vals.size - range_start > @attribute_range_limit)
+          range_end = -1 if vals.size <= range_end
+          rvals = vals[range_start .. range_end]
+          vals = []
+          avseq << OpenSSL::ASN1::Sequence([
+            OpenSSL::ASN1::OctetString("#{attr};range=#{range_start}-#{range_end == -1 ? "*" : range_end}"),
+            OpenSSL::ASN1::Set(rvals.collect { |v| OpenSSL::ASN1::OctetString(v.to_s) })
+          ])
         end
 
         avseq << OpenSSL::ASN1::Sequence([
@@ -200,8 +225,8 @@ class Server
       when 0
         simple_bind(version, dn, authentication.value)
       when 3
-        mechanism = authentication.value[0].value
-        credentials = authentication.value[1].value
+        # mechanism = authentication.value[0].value
+        # credentials = authentication.value[1].value
         # sasl_bind(version, dn, mechanism, credentials)
         # FIXME: needs to exchange further BindRequests
         raise LDAP::ResultError::AuthMethodNotSupported
@@ -243,10 +268,23 @@ class Server
       scope = protocolOp.value[1].value
       deref = protocolOp.value[2].value
       client_sizelimit = protocolOp.value[3].value
-      client_timelimit = protocolOp.value[4].value
+      client_timelimit = protocolOp.value[4].value.to_i
       @typesOnly = protocolOp.value[5].value
       filter = Filter::parse(protocolOp.value[6], @schema)
-      @attributes = protocolOp.value[7].value.collect {|x| x.value}
+      attributes = protocolOp.value[7].value.collect {|x| x.value}
+      attributes = attributes.map do |attr|
+        if attr =~ /(.*);range=(\d+)-(\d+|\*)\z/
+          [$1, $2, $3]
+        else
+          attr
+        end
+      end
+      @attributes = attributes.map do |name, |
+        name
+      end
+      @attribute_ranges = attributes.map do |_, range_start, range_end|
+        range_start && AttributeRange.new(range_start, range_end)
+      end
 
       @rescount = 0
       @sizelimit = server_sizelimit

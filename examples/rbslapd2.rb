@@ -54,7 +54,7 @@ class SQLPool
   ensure
     @pool.push conn
   end
-end    
+end
 
 # An simple LRU cache of username->password. It's linearly searched
 # so don't make it too big.
