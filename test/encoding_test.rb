@@ -89,7 +89,7 @@ class TestLdap < Test::Unit::TestCase
   end
 
   def setup
-    @client_in, @client_out = start_client
+    @client = nil
     @serv = nil
   end
 
@@ -99,167 +99,57 @@ class TestLdap < Test::Unit::TestCase
       @serv = nil
     end
     if @client
-      @client_in << "quit"
-      err = @client_out.pop
-      raise err if "OK" != err
+      # @client.close
       @client = nil
     end
   end
 
-  # Process commands on stdin in child
-
-  def do_child in_, out
-    while true
-      begin
-        a = in_.deq
-        conn ||= Net::LDAP.new(host: HOST, port: PORT)
-        case a
-        when "bind2"
-          #     TODO: Net::LDAP only supports protocol 3
-          conn.set_option(LDAP::LDAP_OPT_PROTOCOL_VERSION, 2)
-          conn.auth("foo","bar")
-          conn.bind
-        when "bind3"
-          conn.auth("foo","bar")
-          conn.bind
-        # these examples taken from the ruby-ldap examples
-        when "add1"
-          entry1 = {
-            objectclass: ['top', 'domain'],
-            o: ['TTSKY.NET'],
-            dc: ['localhost'],
-          }
-          conn.add(dn: "dc=localhost, dc=domain", attributes: entry1)
-        when "add2"
-          entry2 = {
-            objectclass: ['top', 'person'],
-            cn: ['Takaaki Tateishi'],
-            sn: ['ttate','Tateishi', "zero\000zero"],
-          }
-          conn.add(dn: "cn=Takaaki Tateishi, dc=localhost, dc=localdomain", attributes: entry2)
-        when "del"
-          conn.delete(dn: "cn=Takaaki-Tateishi, dc=localhost, dc=localdomain")
-        when /^compare (.*)/
-          begin
-            case conn.compare("cn=Takaaki Tateishi, dc=localhost, dc=localdomain",
-                         "cn", $1)
-            when true; out << "OK true"; next
-            when false; out << "OK false"; next
-            end
-          rescue LDAP::ResultError => e
-            # For older versions of ruby-ldap
-            case e.message
-            when /Compare True/i; out << "OK true"; next
-            when /Compare False/i; out << "OK false"; next
-            end
-            raise
-          end
-        when "modrdn"
-          conn.modify_rdn(olddn: "cn=Takaaki Tateishi, dc=localhost, dc=localdomain",
-                      newrdn: "cn=Takaaki-Tateishi",
-                      delete_attributes: true)
-        when "modify"
-          entry = [
-            [:add, :objectclass, ['top', 'domain']],
-            [:delete, :o, []],
-            [:replace, :dc, ['localhost']],
-          ]
-          conn.modify(dn: "dc=localhost, dc=domain", operations: entry)
-        when "search"
-          res = {}
-          conn.search(base: "dc=localhost, dc=localdomain",
-                      scope: Net::LDAP::SearchScope_WholeSubtree,
-                      filter: "(objectclass=*)") do |e|
-            entry = e.to_h
-            dn = entry.delete(:dn).first
-            res[dn] = entry
-          end
-          exp = {
-            "cn=foo" => {a: ["1","2"], b: ["boing"]},
-            "cn=bar" => {a: ["3","4","5"], b: ["wibble"]},
-          }
-          if res != exp
-            raise "Bad Search Result, expected\n#{exp.inspect}\ngot\n#{res.inspect}"
-          end
-        when "search2"
-          res = {}
-          # FIXME: ruby-ldap doesn't seem to allow DEREF options to be set
-          conn.search(base: "dc=localhost, dc=localdomain",
-                      scope: Net::LDAP::SearchScope_BaseObject,
-                      filter: "(&(cn=foo)(objectclass=*)(|(!(sn=*))(ou>=baz)(o<=z)(cn=*and*er)))",
-                      attributes: [:a, :b]) do |e|
-            entry = e.to_h
-            dn = entry.delete(:dn).first
-            res[dn] = entry
-          end
-        when "search_range"
-          res = {}
-          conn.search(base: "dc=localhost, dc=localdomain",
-                      scope: Net::LDAP::SearchScope_BaseObject,
-                      attributes: ["a;range=1-2", "b"]) do |e|
-            entry = e.to_h
-            dn = entry.delete(:dn).first
-            res[dn] = entry
-          end
-        when "search_range_limit"
-          res = {}
-          conn.search(base: "dc=localhost, dc=localdomain",
-                      scope: Net::LDAP::SearchScope_WholeSubtree,
-                      filter: "(objectclass=*)") do |e|
-            entry = e.to_h
-            dn = entry.delete(:dn).first
-            res[dn] = entry
-          end
-          exp = {
-            "cn=foo" => {a: ["1","2"], b: ["boing"]},
-            "cn=bar" => {a: [], "a;range=0-1": ["3","4"], b: ["wibble"]},
-          }
-          if res != exp
-            raise "Bad Search Result, expected\n#{exp.inspect}\ngot\n#{res.inspect}"
-          end
-        when "quit"
-          out << "OK"
-          break
-        else
-          raise "Bad command! #{a.inspect}"
-        end
-        out << "OK"
-      rescue Exception => e
-        $stderr.puts "Child exception: #{e}\n\t#{e.backtrace.join("\n\t")}"
-        out << "ERR #{e}"
-      end
-    end
-  end
-
-  def req(cmd)
+  def conn
     ensure_server_started
-    @client_in << cmd
-    res = @client_out.deq.chomp
-    assert_match(/^OK/, res)
-    res
+    @client ||= Net::LDAP.new(host: HOST, port: PORT)
   end
 
   def test_bind2
     pend("net-ldap gem doesn't support protocol 2")
-    req("bind2")
+
+    #     TODO: Net::LDAP only supports protocol 3
+    conn.set_option(LDAP::LDAP_OPT_PROTOCOL_VERSION, 2)
+    conn.auth("foo","bar")
+    conn.bind
+
     assert_equal([:simple_bind, 2, "foo", "bar"], MockOperation.lastop)
     # cannot bind any more; ldap client library says "already binded." (sic)
   end
 
   def test_bind3
-    req("bind3")
+    conn.auth("foo","bar")
+    conn.bind
+
     assert_equal([:simple_bind, 3, "foo", "bar"], MockOperation.lastop)
     # cannot bind any more; ldap client library says "already binded." (sic)
   end
 
   def test_add
-    req("add1")
+    entry1 = {
+      objectclass: ['top', 'domain'],
+      o: ['TTSKY.NET'],
+      dc: ['localhost'],
+    }
+    conn.add(dn: "dc=localhost, dc=domain", attributes: entry1)
+
     assert_equal([:add, "dc=localhost, dc=domain", {
       'objectclass'=>['top', 'domain'],
       'o'=>['TTSKY.NET'],
       'dc'=>['localhost'],
     }], MockOperation.lastop)
-    req("add2")
+
+    entry2 = {
+      objectclass: ['top', 'person'],
+      cn: ['Takaaki Tateishi'],
+      sn: ['ttate','Tateishi', "zero\000zero"],
+    }
+    conn.add(dn: "cn=Takaaki Tateishi, dc=localhost, dc=localdomain", attributes: entry2)
+
     assert_equal([:add, "cn=Takaaki Tateishi, dc=localhost, dc=localdomain", {
       'objectclass'=>['top', 'person'],
       'cn'=>['Takaaki Tateishi'],
@@ -268,31 +158,44 @@ class TestLdap < Test::Unit::TestCase
   end
 
   def test_del
-    req("del")
+    conn.delete(dn: "cn=Takaaki-Tateishi, dc=localhost, dc=localdomain")
     assert_equal([:del, "cn=Takaaki-Tateishi, dc=localhost, dc=localdomain"], MockOperation.lastop)
   end
 
   def test_compare
     pend("net-ldap gem doesn't support compare requests")
-    r = req("compare Takaaki Tateishi")
-    assert_match(/OK true/, r)
+    res = conn.compare("cn=Takaaki Tateishi, dc=localhost, dc=localdomain",
+                      "cn", "Takaaki Tateishi")
+
     assert_equal([:compare, "cn=Takaaki Tateishi, dc=localhost, dc=localdomain",
       "cn", "Takaaki Tateishi"], MockOperation.lastop)
-    r = req("compare false")
-    assert_match(/OK false/, r)
+    assert res
+
+    res = conn.compare("cn=Takaaki Tateishi, dc=localhost, dc=localdomain",
+                      "cn", "false")
     assert_equal([:compare, "cn=Takaaki Tateishi, dc=localhost, dc=localdomain",
       "cn", "false"], MockOperation.lastop)
+    refute res
   end
 
   def test_modrdn
-    req("modrdn")
+    conn.modify_rdn(olddn: "cn=Takaaki Tateishi, dc=localhost, dc=localdomain",
+                newrdn: "cn=Takaaki-Tateishi",
+                delete_attributes: true)
+
     assert_equal([:modifydn, "cn=Takaaki Tateishi, dc=localhost, dc=localdomain",
       "cn=Takaaki-Tateishi", true, nil], MockOperation.lastop)
     # FIXME: ruby-ldap doesn't support the four-argument form
   end
 
   def test_modify
-    req("modify")
+    entry = [
+      [:add, :objectclass, ['top', 'domain']],
+      [:delete, :o, []],
+      [:replace, :dc, ['localhost']],
+    ]
+    conn.modify(dn: "dc=localhost, dc=domain", operations: entry)
+
     assert_equal([:modify, "dc=localhost, dc=domain", {
         'objectclass' => [:add, 'top', 'domain'],
         'o' => [:delete],
@@ -301,12 +204,33 @@ class TestLdap < Test::Unit::TestCase
   end
 
   def test_search
-    req("search")
+    res = []
+    conn.search(base: "dc=localhost, dc=localdomain",
+                scope: Net::LDAP::SearchScope_WholeSubtree,
+                filter: "(objectclass=*)") do |e|
+      res << e.to_h
+    end
+
     assert_equal([:search, "dc=localhost, dc=localdomain",
       LDAP::Server::WholeSubtree,
       LDAP::Server::NeverDerefAliases,
       [:true], []], MockOperation.lastop)
-    req("search2")
+
+    exp = [
+      {a: ["1","2"], b: ["boing"], dn: ["cn=foo"]},
+      {a: ["3","4","5"], b: ["wibble"], dn: ["cn=bar"]},
+    ]
+    assert_equal exp, res
+
+    res = []
+    # FIXME: ruby-ldap doesn't seem to allow DEREF options to be set
+    conn.search(base: "dc=localhost, dc=localdomain",
+                scope: Net::LDAP::SearchScope_BaseObject,
+                filter: "(&(cn=foo)(objectclass=*)(|(!(sn=*))(ou>=baz)(o<=z)(cn=*and*er)))",
+                attributes: [:a, :b]) do |e|
+      res << e.to_h
+    end
+
     assert_equal([:search, "dc=localhost, dc=localdomain",
       LDAP::Server::BaseObject,
       LDAP::Server::NeverDerefAliases,
@@ -317,22 +241,49 @@ class TestLdap < Test::Unit::TestCase
                     [:substrings, "cn", nil, nil, "and", "er"],
              ],
       ], ["a","b"]], MockOperation.lastop)
+
+    assert_equal exp, res
   end
 
   def test_search_with_range
-    req("search_range")
+    res = []
+    conn.search(base: "dc=localhost, dc=localdomain",
+                scope: Net::LDAP::SearchScope_BaseObject,
+                attributes: ["a;range=1-2", "b"]) do |e|
+      res << e.to_h
+    end
+
     assert_equal([:search, "dc=localhost, dc=localdomain",
       LDAP::Server::BaseObject,
       LDAP::Server::NeverDerefAliases,
       [:true], ["a","b"]], MockOperation.lastop)
+
+    exp = [
+      {a: [], "a;range=1-*": ["2"], b: ["boing"], dn: ["cn=foo"]},
+      {a: [], "a;range=1-2": ["4","5"], b: ["wibble"], dn: ["cn=bar"]},
+    ]
+    assert_equal exp, res
   end
 
   def test_search_with_range_limit
     start_server(attribute_range_limit: 2)
-    req("search_range_limit")
+
+    res = []
+    conn.search(base: "dc=localhost, dc=localdomain",
+                scope: Net::LDAP::SearchScope_WholeSubtree,
+                filter: "(objectclass=*)") do |e|
+      res << e.to_h
+    end
+
     assert_equal([:search, "dc=localhost, dc=localdomain",
       LDAP::Server::WholeSubtree,
       LDAP::Server::NeverDerefAliases,
       [:true], []], MockOperation.lastop)
+
+    exp = [
+      {a: ["1","2"], b: ["boing"], dn: ["cn=foo"]},
+      {a: [], "a;range=0-1": ["3","4"], b: ["wibble"], dn: ["cn=bar"]},
+    ]
+    assert_equal exp, res
   end
 end

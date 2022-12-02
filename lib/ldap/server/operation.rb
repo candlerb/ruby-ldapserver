@@ -147,6 +147,7 @@ class Server
             range_end = @attribute_range_limit ? @attribute_range_limit - 1 : -1
           end
           range_end = range_start + @attribute_range_limit - 1 if @attribute_range_limit && (vals.size - range_start > @attribute_range_limit)
+          range_end = -1 if vals.size <= range_end
           rvals = vals[range_start .. range_end]
           vals = []
           avseq << OpenSSL::ASN1::Sequence([
